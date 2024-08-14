@@ -1,10 +1,20 @@
 import os
 import sys
 
-def generate_file_list(root_directory, output_file):
+"""
+Get file list like:
+id filepath
+
+Used for extracting embeddings later!
+"""
+
+def generate_file_list(root_directory, output_file, class_list):
     with open(output_file, 'w') as f:
         # Initialize class ID from folder names
         for class_folder in sorted(os.listdir(root_directory)):
+            if class_folder not in class_list:
+                continue
+
             class_folder_path = os.path.join(root_directory, class_folder)
             
             if os.path.isdir(class_folder_path):
@@ -22,8 +32,8 @@ def generate_file_list(root_directory, output_file):
                         f.write(f"{class_folder} {item_path}\n")
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python generate_file_list.py root_directory")
+    if len(sys.argv) != 4:
+        print("Usage: python generate_file_list.py root_directory out_file classes_list")
         sys.exit(1)
 
     root_directory = sys.argv[1]
@@ -32,7 +42,12 @@ if __name__ == "__main__":
         print(f"Directory {root_directory} does not exist.")
         sys.exit(1)
 
-    output_file = 'file_list.txt'
-    generate_file_list(root_directory, output_file)
+    output_file = sys.argv[2]
+    class_list = []
+    with open(sys.argv[3],'r') as f:
+        for line in f:
+            class_list.append(line.strip())
+
+    generate_file_list(root_directory, output_file, class_list)
     print(f"File list generated: {output_file}")
 

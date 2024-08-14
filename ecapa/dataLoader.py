@@ -122,7 +122,7 @@ class test_loader(object):
         audio = audio[start_frame:start_frame + length]
         audio = numpy.stack([audio],axis=0)
        
-        return torch.FloatTensor(audio[0]), self.data_label[index]
+        return torch.FloatTensor(audio[0]), self.data_label[index], self.data_list[index]
 
     def __len__(self):
         return len(self.data_list)

@@ -124,11 +124,12 @@ class ECAPAModel(nn.Module):
                 embs_dict = {}
                 embs_dict['concat_labels'] = []
                 embs_dict['concat_features'] = []
-                for num, (data, labels) in enumerate(tqdm(test_dataloader), start = 1):
+                embs_dict['concat_audios'] = []
+                for num, (data, labels, audios) in enumerate(tqdm(test_dataloader), start = 1):
                         with torch.no_grad():
                                 speaker_embeddings = self.speaker_encoder.forward(data.cuda(), aug = False).cpu().numpy()
                                 embs_dict['concat_features'].append(speaker_embeddings)
                                 embs_dict['concat_labels'].extend(labels.cpu().tolist())
-
+                                embs_dict['concat_audios'].extend(audios)
                 embs_dict['concat_features'] = np.concatenate(embs_dict['concat_features'],axis=0)
                 pkl.dump(embs_dict, open(out_file, 'wb'))
