@@ -30,7 +30,7 @@ if not os.path.exists(out_dir):
 
 seed = 42
 n_tasks = 10000
-batch_size = 100
+batch_size = 50
 
 args={}
 args['iter']=30
@@ -59,6 +59,7 @@ for k_shot in k_shots:
             acc["simpleshot_maj"] = []
             acc["simpleshot_centroid"] = []
             acc["simpleshot_EM"] = []
+            acc["simpleshot_EM_frobenius"] = []
             acc["simpleshot_EM_normal"] = []
             acc["paddle"] = {}
             acc['paddle_2stage'] = {}
@@ -108,6 +109,10 @@ for k_shot in k_shots:
                     acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end]) 
                     acc["simpleshot_EM_normal"].extend(acc_list)
 
+                    eval = Simpleshot(avg="mean",backend="L2",method="EM_frobenius")
+                    acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end]) 
+                    acc["simpleshot_EM_frobenius"].extend(acc_list)
+
                     eval = Simpleshot(avg="mean",backend="cosine",method="transductive_centroid")
                     acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end]) 
                     acc['simpleshot_centroid'].extend(acc_list)
@@ -144,6 +149,7 @@ for k_shot in k_shots:
             final_json['simpleshot_centroid'] = 100*sum(acc["simpleshot_centroid"])/len(acc["simpleshot_centroid"])
             final_json['simpleshot_EM'] = 100*sum(acc["simpleshot_EM"])/len(acc["simpleshot_EM"])
             final_json['simpleshot_EM_normal'] = 100*sum(acc["simpleshot_EM_normal"])/len(acc["simpleshot_EM_normal"])
+            final_json['simpleshot_EM_frobenius'] = 100*sum(acc["simpleshot_EM_frobenius"])/len(acc["simpleshot_EM_frobenius"])
 
             final_json['paddle'] = {}
             final_json['paddle_2stage'] = {}
@@ -152,6 +158,7 @@ for k_shot in k_shots:
             
             with open(out_file,'w') as f:
                 json.dump(final_json,f)
+
             if k_shot == 1:
                 continue    
             try:

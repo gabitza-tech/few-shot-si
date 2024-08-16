@@ -524,9 +524,9 @@ def GLASSO(C, S_0, lambd, max_iter=20000, eps=5e-7):
         if criterion < eps:
             break
         
-    if i >= max_iter:
-        print("GLASSO stopped after max number of iterations")
-    else:
-        print("GLASSO completed in ", i, "iterations")
+    #if i >= max_iter:
+    #    print("GLASSO stopped after max number of iterations")
+    #else:
+    #    print("GLASSO completed in ", i, "iterations")
     #return x_n
     return Z

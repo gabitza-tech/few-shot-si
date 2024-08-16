@@ -1,9 +1,7 @@
 import os
 import sys 
 
-embeddings = ['embeddings_cn2_vox2/cnceleb1_dev.pkl',
-              'embeddings_vox2/cnceleb1_dev.pkl',
-              'embeddings_cn2_vox2/voxceleb1_dev.pkl',
+embeddings = ['embeddings_cn2_vox2/voxceleb1_dev.pkl',
               'embeddings_vox2/voxceleb1_dev.pkl']
 
 

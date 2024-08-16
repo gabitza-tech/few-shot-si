@@ -404,13 +404,13 @@ class PADDLE_GLASSO(KM):
             n_task, n_ways = y_s_one_hot.size(0), y_s_one_hot.size(2)
             feature_dim = support.size(2)
             self.s = torch.zeros(n_task,n_ways,feature_dim,feature_dim).to(self.device)
-            for a in range(n_task):
+            for a in tqdm(range(n_task)):
                 for k in range(n_ways):
                     features = support[a][y_s[a] == k, ...].to(self.device)
                     C = torch.cov(features.T).to(self.device)
                     
                     if True: #k!= 1:
-                        print("features", features.shape)
+                        #print("features", features.shape)
                         #C = torch.cov(features.T, aweights=y_s_one_hot[a,:,k])
                         S_0 = torch.eye(feature_dim)
                         S =  GLASSO(C.to(self.device), S_0.to(self.device), lambd_GLASSO, max_iter=200, eps=5e-7)
@@ -428,7 +428,7 @@ class PADDLE_GLASSO(KM):
                         #f = open(save_dir + f'S_{k}.plk', 'wb')
                         #pickle.dump(S, f)
                         #f.close()
-                        print('ok')
+                        #print('ok')
 
                     else:
                         S=torch.pinverse(C)

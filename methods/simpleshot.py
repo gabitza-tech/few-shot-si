@@ -22,6 +22,8 @@ class Simpleshot():
             pred_labels, pred_labels_5 = self.transductive_centroid(enroll_embs,enroll_labels,test_embs,test_labels)
         elif self.method == "EM":
             pred_labels, pred_labels_5 = self.estimation_maximization(enroll_embs,enroll_labels,test_embs,test_labels)
+        elif self.method == "EM_frobenius":
+            pred_labels, pred_labels_5 = self.estimation_maximization_frobenius(enroll_embs,enroll_labels,test_embs,test_labels)
         elif self.method == "EM_normal":
             pred_labels, pred_labels_5 = self.estimation_maximization_normal(enroll_embs,enroll_labels,test_embs,test_labels)
         elif self.method == "inductive_maj":
@@ -90,6 +92,48 @@ class Simpleshot():
                 #w_s = np.expand_dims((torch.from_numpy(w_s) / torch.from_numpy(w_s).norm(dim=-1,keepdim=True)).numpy(),0)
                 w_s_norm = np.expand_dims(np.linalg.norm(w_s, ord=2, axis=-1), axis=-1)
                 w_s = w_s / w_s_norm
+                
+                dist_w_sq_support = np.sum((w_sq-z_s)**2,axis=0)
+                dist_w_s_support = np.sum((w_s-z_s)**2,axis=0)
+                dist_w_sq_query = np.sum((w_sq-z_q)**2,axis=0)
+                
+                final_distance = dist_w_sq_query + dist_w_sq_support - dist_w_s_support
+
+                task_distances.append(final_distance)
+            distances.append(task_distances)
+
+        distances = np.asarray(distances)
+
+        return distances
+    def calculate_sq_z_dist_frobenius(self,enroll_embs,test_embs,enroll_labels):
+        # Returns [n_tasks,n_ways,192] tensor with the centroids
+        # sampled_classes: [n_tasks,n_ways]
+        
+        sampled_classes=[]
+        for task in enroll_labels:
+            sampled_classes.append(sorted(list(set(task))))
+
+        distances = []
+        for i,task_classes in enumerate(sampled_classes):
+            task_distances = []
+            z_q = test_embs[i] # this one is the same for all classes, differs only per task
+            for label in task_classes:
+                indices = np.where(enroll_labels[i] == label)
+                # ALL THESE ARE FOR CLASS l (label)
+                z_s = enroll_embs[i][indices]
+                
+                N_samples_SQ = len(indices[0])+z_q.shape[0]
+                N_samples_S = len(indices[0])
+                
+                w_sq = (z_s.sum(axis=0).squeeze() + z_q.sum(axis=0).squeeze()) / N_samples_SQ
+                w_sq = np.expand_dims((torch.from_numpy(w_sq) / torch.from_numpy(w_sq).norm(dim=-1, keepdim=True)).numpy(),0)
+                #w_sq_norm = np.expand_dims(np.linalg.norm(w_sq, ord=2, axis=-1), axis=-1)
+                #w_sq = w_sq / w_sq_norm
+
+                w_s = (z_s.sum(axis=0).squeeze() / N_samples_S)
+                w_s = np.expand_dims((torch.from_numpy(w_s) / torch.from_numpy(w_s).norm(dim=-1,keepdim=True)).numpy(),0)
+                #w_s_norm = np.expand_dims(np.linalg.norm(w_s, ord=2, axis=-1), axis=-1)
+                #w_s = w_s / w_s_norm
                 
                 dist_w_sq_support = np.sum((w_sq-z_s)**2,axis=0)
                 dist_w_s_support = np.sum((w_s-z_s)**2,axis=0)
@@ -244,6 +288,19 @@ class Simpleshot():
         device_here = torch.device('cuda:0')
         
         dist = torch.from_numpy(self.calculate_sq_z_dist_normal(enroll_embs, test_embs,enroll_labels))
+        C_l = torch.sum(dist,dim=-1)
+        pred_labels = torch.argmin(C_l,-1).unsqueeze(1).repeat(1,n_query).to(torch.device('cpu'))
+        _,pred_labels_top5 = torch.topk(C_l, k=5, dim=1, largest=False)
+        
+        return pred_labels,pred_labels_top5
+    
+    def estimation_maximization_frobenius(self,enroll_embs,enroll_labels,test_embs,test_labels):
+        print("Using Estimation maximization method")
+        n_query = test_embs.shape[1]
+        
+        device_here = torch.device('cuda:0')
+        
+        dist = torch.from_numpy(self.calculate_sq_z_dist_frobenius(enroll_embs, test_embs,enroll_labels))
         C_l = torch.sum(dist,dim=-1)
         pred_labels = torch.argmin(C_l,-1).unsqueeze(1).repeat(1,n_query).to(torch.device('cpu'))
         _,pred_labels_top5 = torch.topk(C_l, k=5, dim=1, largest=False)

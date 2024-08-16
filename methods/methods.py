@@ -389,7 +389,7 @@ def run_paddle_new(enroll_embs,enroll_labels,test_embs,test_labels,method_info,m
 
 def run_2stage_paddle(enroll_embs,enroll_labels,test_embs,test_labels, test_audios,method_info):
 
-    eval = Simpleshot(avg="mean",backend="L2",method="EM")
+    eval = Simpleshot(avg="mean",backend="L2",method="transductive_centroid")
     acc_list, acc_list_5, pred_labels_5 = eval.eval(enroll_embs, enroll_labels, test_embs, test_labels, test_audios) 
 
     new_x_s = []

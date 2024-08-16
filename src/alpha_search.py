@@ -30,7 +30,7 @@ if not os.path.exists(out_dir):
 
 seed = 42
 n_tasks = 500
-batch_size = 100
+batch_size = 50
 
 args={}
 args['iter']=30
@@ -45,7 +45,7 @@ np.random.seed(seed)
 #alphas = [5]#[i for i in range(0,20)]#[i for i in range(0, 16) if i % 3 == 0 or i % 5 == 0]
 alphas_glasso = [100,1000,10000]#[0,10,100,1000,10000,100000,1000000]
 n_queries = [5,3,1]
-k_shots = [1,5,3]
+k_shots = [5,3,1]
 n_ways_effs = [1]
 
 #uniq_classes = sorted(list(set(enroll_dict['concat_labels'])))
@@ -83,6 +83,7 @@ for k_shot in k_shots:
             acc["simpleshot_maj"] = []
             acc["simpleshot_centroid"] = []
             acc["simpleshot_EM"] = []
+            acc["simpleshot_EM_frobenius"] = []
             acc["paddle"] = {}
             acc['paddle_2stage'] = {}
             for alpha in alphas:
@@ -110,6 +111,10 @@ for k_shot in k_shots:
                     eval = Simpleshot(avg="mean",backend="L2",method="EM")
                     acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end]) 
                     acc["simpleshot_EM"].extend(acc_list)
+
+                    eval = Simpleshot(avg="mean",backend="L2",method="EM_frobenius")
+                    acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end]) 
+                    acc["simpleshot_EM_frobenius"].extend(acc_list)
 
                     eval = Simpleshot(avg="mean",backend="cosine",method="transductive_centroid")
                     acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end]) 
@@ -154,6 +159,7 @@ for k_shot in k_shots:
             final_json['simpleshot_maj'] = 100*sum(acc["simpleshot_maj"])/len(acc["simpleshot_maj"])
             final_json['simpleshot_centroid'] = 100*sum(acc["simpleshot_centroid"])/len(acc["simpleshot_centroid"])
             final_json['simpleshot_EM'] = 100*sum(acc["simpleshot_EM"])/len(acc["simpleshot_EM"])
+            final_json['simpleshot_EM_frobenius'] = 100*sum(acc["simpleshot_EM_frobenius"])/len(acc["simpleshot_EM_frobenius"])
             
             final_json['paddle'] = {}
             final_json['paddle_2stage'] = {}
