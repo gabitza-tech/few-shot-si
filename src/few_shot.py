@@ -38,7 +38,7 @@ args['iter']=30
 use_mean = sys.argv[3]
 
 n_queries = [5,3,1]
-k_shots = [1]
+k_shots = [int(sys.argv[4])]
 n_ways_effs = [1]
 
 #uniq_classes = sorted(list(set(enroll_dict['concat_labels'])))
@@ -125,8 +125,9 @@ for k_shot in k_shots:
                 method_info = {'device':'cuda','args':args}
                 acc_list,_ = run_paddle_new(x_s, y_s, x_q, y_q,method_info,'paddle')                
                 acc['paddle'][str(alpha)].extend(acc_list)
-                
-                #continue
+
+                if k_shot == 1:                
+                    continue
 
                 args['alpha'] = alpha_glasso
                 method_info = {'device':'cuda','args':args}
@@ -151,7 +152,8 @@ for k_shot in k_shots:
             
             with open(out_file,'w') as f:
                 json.dump(final_json,f)
-            #continue    
+            if k_shot == 1:
+                continue    
             try:
                 final_json['paddle_2stage'][str(alpha_glasso)] = 100*sum(acc["paddle_2stage"][str(alpha_glasso)])/len(acc["paddle_2stage"][str(alpha_glasso)])
             except:
