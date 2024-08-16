@@ -206,6 +206,8 @@ def analyze_data(data):
     print(f"Maximum appearances of a label: {max_appearances}")
     print(f"Average appearances of a label: {average_appearances}")
 
+
+
 def embedding_normalize(embs, use_mean=True,use_std=False, eps=1e-10):
     """
     Mean and l2 length normalize the input speaker embeddings
@@ -232,12 +234,51 @@ def embedding_normalize(embs, use_mean=True,use_std=False, eps=1e-10):
 
     return embs
 
-def CL2N_embeddings(enroll_embs,test_embs,normalize,use_mean=True):
-    if not normalize:
-        return enroll_embs, test_embs
+def embs_norm_both(test_embs, enroll_embs, mean=None,use_std=False, eps=1e-10):
+    """
+    Mean and l2 length normalize the input speaker embeddings
+
+    Args:
+        embs: embeddings of shape (Batch,emb_size)
+    Returns:
+        embs: normalized embeddings of shape (Batch,emb_size)
+    """
+    if mean is not None:
+        test_embs = test_embs - mean
+        enroll_embs = enroll_embs - mean
     
+    if use_std:
+        test_embs = test_embs / (test_embs.std(axis=0) + eps)
+        enroll_embs = enroll_embs / (enroll_embs.std(axis=0) + eps)
+    
+    test_embs_l2_norm = np.expand_dims(np.linalg.norm(test_embs, ord=2, axis=-1), axis=-1)
+    test_embs = test_embs / test_embs_l2_norm
+
+    enroll_embs_l2_norm = np.expand_dims(np.linalg.norm(enroll_embs, ord=2, axis=-1), axis=-1)
+    enroll_embs = enroll_embs / enroll_embs_l2_norm
+
+    return test_embs, enroll_embs
+
+def CL2N_embeddings(enroll_embs, test_embs, use_mean=True, use_std=False, eps=1e-10):
+
     all_embs = np.concatenate((enroll_embs,test_embs),axis=1)
-    all_embs = embedding_normalize(all_embs,use_mean=use_mean)
+
+    initial_shape = all_embs.copy().shape
+    #if len(initial_shape) == 3:
+    #    all_embs = all_embs.reshape((-1, all_embs.shape[-1]))
+
+    if use_mean:
+        all_embs = all_embs - np.expand_dims(all_embs.mean(axis=1),1)
+    
+    if use_std:
+        all_embs = all_embs / (all_embs.std(axis=1) + eps)
+
+    embs_l2_norm = np.expand_dims(np.linalg.norm(all_embs, ord=2, axis=-1), axis=-1)
+    all_embs = all_embs / embs_l2_norm
+
+    #if len(initial_shape) == 3:
+    #    all_embs = all_embs.reshape(initial_shape)
+    
     enroll_embs = all_embs[:,:enroll_embs.shape[1]]
     test_embs = all_embs[:,enroll_embs.shape[1]:]
 
