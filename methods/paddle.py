@@ -57,7 +57,7 @@ class KM(object):
         counts = one_hot.sum(1).view(n_tasks, -1, 1)
         weights = one_hot.transpose(1, 2).matmul(support)
         self.w = weights / counts
-
+        self.w = self.w / self.w.norm(dim=-1, keepdim=True)
 
     def record_convergence(self, new_time, criterions):
         """
@@ -208,6 +208,7 @@ class PADDLE(KM):
                    + torch.einsum('bkq,bqd->bkd',torch.transpose(y_s_one_hot, 1, 2), support)
         den  = self.u.sum(1) + y_s_one_hot.sum(1)
         self.w = torch.div(num, den.unsqueeze(2))
+        self.w = self.w / self.w.norm(dim=-1, keepdim=True)
 
     def run_method(self, support, query, y_s, y_q):
         """
