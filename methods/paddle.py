@@ -74,14 +74,8 @@ class KM(object):
         inputs:
             y_q : torch.Tensor of shape [n_task, n_query] :
         """
-        #print(self.u)
         preds_q = self.u.argmax(2).to(torch.device('cpu'))
         y_q = y_q.to(torch.device('cpu'))
-        #_,preds_q_top5 = torch.topk(self.u, k=5, dim=2, largest=True)
-        #preds_q_top5 = preds_q_top5.reshape(preds_q_top5.shape[0],-1)
-        #most_common_values = top_k_most_common(preds_q_top5, k=5)
-
-        #print(f"Paddle predictions: {preds_q}!!!")
 
         if self.maj_vote:
             
@@ -92,14 +86,7 @@ class KM(object):
         else:
             accuracy = (preds_q == y_q).float().mean(1, keepdim=True)
         
-        #if 0 in accuracy:
-        #    print(preds_q)
-        #    print(y_q)
-        #    print(accuracy)
         self.test_acc.append(accuracy)
-        
-        #self.test_acc_top5.append(result)
-        
 
     def get_logs(self):
 

@@ -7,34 +7,35 @@ import torch.nn.functional as F
 import random
 
 class Simpleshot():
-    def __init__(self,avg="mean",backend="cosine", majority="True",device='cpu', method="inductive"):
+    
+    def __init__(self,avg="mean",backend="cosine", device='cpu', method="inductive"):
         self.avg = avg
         self.backend = backend
-        self.majority = majority
         self.device = torch.device(device)
         self.method = method
 
     def eval(self,enroll_embs,enroll_labels,test_embs,test_labels, test_audios):
 
-        if self.method == "inductive":
+        if self.method == "ss":
             pred_labels, pred_labels_5 = self.inductive(enroll_embs,enroll_labels,test_embs,test_labels)
-        elif self.method == "transductive_centroid":
-            pred_labels, pred_labels_5 = self.transductive_centroid(enroll_embs,enroll_labels,test_embs,test_labels)
-        elif self.method == "EM":
-            pred_labels, pred_labels_5 = self.estimation_maximization(enroll_embs,enroll_labels,test_embs,test_labels)
-        elif self.method == "EM_frobenius":
-            pred_labels, pred_labels_5 = self.estimation_maximization_frobenius(enroll_embs,enroll_labels,test_embs,test_labels)
-        elif self.method == "EM_normal":
-            pred_labels, pred_labels_5 = self.estimation_maximization_normal(enroll_embs,enroll_labels,test_embs,test_labels)
-        elif self.method == "inductive_maj":
+        
+        elif self.method == "smv":
             pred_labels, pred_labels_5 = self.inductive(enroll_embs,enroll_labels,test_embs,test_labels)
             pred_labels = majority_or_original(pred_labels)
-            
+        
+        elif self.method == "sscd":
+            pred_labels, pred_labels_5 = self.sscd(enroll_embs,enroll_labels,test_embs,test_labels)
+        
+        elif self.method == "fsaic":
+            pred_labels, pred_labels_5 = self.fsaic(enroll_embs,enroll_labels,test_embs,test_labels,method='normal')
+        
+        elif self.method == "fsaic_centroid":
+            pred_labels, pred_labels_5 = self.fsaic(enroll_embs,enroll_labels,test_embs,test_labels,method='centroid')
+        
         test_labels = torch.from_numpy(test_labels).long()
 
         acc_tasks = compute_acc(pred_labels, test_labels)
         acc_tasks_5 = compute_acc_5(pred_labels_5, test_labels)
-
 
         return acc_tasks, acc_tasks_5, pred_labels_5
 
@@ -63,130 +64,77 @@ class Simpleshot():
 
         return avg_enroll_embs
 
-    def calculate_sq_z_dist(self,enroll_embs,test_embs,enroll_labels):
+    def calculate_sq_z_dist(self,enroll_embs,test_embs,enroll_labels, method='centroid'):
         # Returns [n_tasks,n_ways,192] tensor with the centroids
         # sampled_classes: [n_tasks,n_ways]
-        
         sampled_classes=[]
         for task in enroll_labels:
             sampled_classes.append(sorted(list(set(task))))
 
         distances = []
+        z_s_all = []
+        w_s_all = []
+        w_sq_all = []
+        w_q_all = []
         for i,task_classes in enumerate(sampled_classes):
             task_distances = []
-            z_q = test_embs[i] # this one is the same for all classes, differs only per task
+            # Query samples for task i
+            z_q = test_embs[i] 
+            z_s_task = []
+            w_s_task = []
+            w_sq_task = []
+            w_q_task = []
             for label in task_classes:
+                
                 indices = np.where(enroll_labels[i] == label)
-                # ALL THESE ARE FOR CLASS l (label)
+                # Samples from class 'label' from S
                 z_s = enroll_embs[i][indices]
                 
-                N_samples_SQ = len(indices[0])+z_q.shape[0]
-                N_samples_S = len(indices[0])
+                sum_z_s = z_s.sum(axis=0).squeeze()
+                sum_z_q = z_q.sum(axis=0).squeeze()
+
+                w_sq = (sum_z_s + sum_z_q) #/ np.expand_dims(np.linalg.norm((sum_z_s+sum_z_q), ord=2, axis=-1),axis=-1)
+                w_s = sum_z_s #/ np.expand_dims(np.linalg.norm(sum_z_s, ord=2, axis=-1),axis=-1)
+                w_q = sum_z_q #/ np.expand_dims(np.linalg.norm(sum_z_q, ord=2, axis=-1),axis=-1)
                 
-                w_sq = (z_s.sum(axis=0).squeeze() + z_q.sum(axis=0).squeeze()) / N_samples_SQ
-                #w_sq = np.expand_dims((torch.from_numpy(w_sq) / torch.from_numpy(w_sq).norm(dim=-1, keepdim=True)).numpy(),0)
-                w_sq_norm = np.expand_dims(np.linalg.norm(w_sq, ord=2, axis=-1), axis=-1)
-                w_sq = w_sq / w_sq_norm
+                z_s_task.append(z_s)
+                w_q_task.append(w_q)
+                w_s_task.append(w_s)
+                w_sq_task.append(w_sq)
 
-                w_s = (z_s.sum(axis=0).squeeze() / N_samples_S)
-                #w_s = np.expand_dims((torch.from_numpy(w_s) / torch.from_numpy(w_s).norm(dim=-1,keepdim=True)).numpy(),0)
-                w_s_norm = np.expand_dims(np.linalg.norm(w_s, ord=2, axis=-1), axis=-1)
-                w_s = w_s / w_s_norm
-                
-                dist_w_sq_support = np.sum((w_sq-z_s)**2,axis=0)
-                dist_w_s_support = np.sum((w_s-z_s)**2,axis=0)
-                dist_w_sq_query = np.sum((w_sq-z_q)**2,axis=0)
-                
-                final_distance = dist_w_sq_query + dist_w_sq_support - dist_w_s_support
+            #distances.append(task_distances)
+            z_s_all.append(z_s_task)
+            w_q_all.append(w_q_task)
+            w_sq_all.append(w_sq_task)
+            w_s_all.append(w_s_task)
 
-                task_distances.append(final_distance)
-            distances.append(task_distances)
+        test_embs = np.expand_dims(test_embs,1)
+        #print(f'test embs:{test_embs.shape}')
+        z_s = np.asarray(z_s_all)
+        #print(f'shape z_s:{z_s.shape}')
+        w_q_all = np.expand_dims(np.asarray(w_q_all),2)
+        w_q = w_q_all/ np.expand_dims(np.linalg.norm(w_q_all, ord=2, axis=-1),axis=-1)
+        #print(f'shape w_q:{w_q.shape}')
+        w_sq_all = np.expand_dims(np.asarray(w_sq_all),2)
+        w_sq = w_sq_all / np.expand_dims(np.linalg.norm(w_sq_all, ord=2, axis=-1),axis=-1)
+        #print(f'shape w_sq:{w_sq.shape}')
+        w_s_all = np.expand_dims(np.asarray(w_s_all),2)
+        w_s = w_s_all / np.expand_dims(np.linalg.norm(w_s_all, ord=2, axis=-1),axis=-1)
+        #print(f'shape w_s:{w_s.shape}')
 
-        distances = np.asarray(distances)
+        if method == 'normal':
+            dist_w_sq_support = np.sum((w_sq-z_s)**2,axis=2)
+            dist_w_s_support = np.sum((w_s-z_s)**2,axis=2)
+            dist_w_sq_query = np.sum((w_sq-test_embs)**2,axis=2)
 
-        return distances
-    def calculate_sq_z_dist_frobenius(self,enroll_embs,test_embs,enroll_labels):
-        # Returns [n_tasks,n_ways,192] tensor with the centroids
-        # sampled_classes: [n_tasks,n_ways]
-        
-        sampled_classes=[]
-        for task in enroll_labels:
-            sampled_classes.append(sorted(list(set(task))))
+        elif method == 'centroid': # BETTER
+            dist_w_sq_support = np.sum((w_sq-z_s)**2,axis=2)
+            dist_w_s_support = np.sum((w_s-z_s)**2,axis=2)
+            dist_w_sq_query = np.sum((w_sq-w_q)**2,axis=2)
 
-        distances = []
-        for i,task_classes in enumerate(sampled_classes):
-            task_distances = []
-            z_q = test_embs[i] # this one is the same for all classes, differs only per task
-            for label in task_classes:
-                indices = np.where(enroll_labels[i] == label)
-                # ALL THESE ARE FOR CLASS l (label)
-                z_s = enroll_embs[i][indices]
-                
-                N_samples_SQ = len(indices[0])+z_q.shape[0]
-                N_samples_S = len(indices[0])
-                
-                w_sq = (z_s.sum(axis=0).squeeze() + z_q.sum(axis=0).squeeze()) / N_samples_SQ
-                w_sq = np.expand_dims((torch.from_numpy(w_sq) / torch.from_numpy(w_sq).norm(dim=-1, keepdim=True)).numpy(),0)
-                #w_sq_norm = np.expand_dims(np.linalg.norm(w_sq, ord=2, axis=-1), axis=-1)
-                #w_sq = w_sq / w_sq_norm
+        final_distance = dist_w_sq_query + (dist_w_sq_support - dist_w_s_support)
 
-                w_s = (z_s.sum(axis=0).squeeze() / N_samples_S)
-                w_s = np.expand_dims((torch.from_numpy(w_s) / torch.from_numpy(w_s).norm(dim=-1,keepdim=True)).numpy(),0)
-                #w_s_norm = np.expand_dims(np.linalg.norm(w_s, ord=2, axis=-1), axis=-1)
-                #w_s = w_s / w_s_norm
-                
-                dist_w_sq_support = np.sum((w_sq-z_s)**2,axis=0)
-                dist_w_s_support = np.sum((w_s-z_s)**2,axis=0)
-                dist_w_sq_query = np.sum((w_sq-z_q)**2,axis=0)
-                
-                final_distance = dist_w_sq_query + dist_w_sq_support - dist_w_s_support
-
-                task_distances.append(final_distance)
-            distances.append(task_distances)
-
-        distances = np.asarray(distances)
-
-        return distances
-
-    def calculate_sq_z_dist_normal(self,enroll_embs,test_embs,enroll_labels):
-        # Returns [n_tasks,n_ways,192] tensor with the centroids
-        # sampled_classes: [n_tasks,n_ways]
-        
-        sampled_classes=[]
-        for task in enroll_labels:
-            sampled_classes.append(sorted(list(set(task))))
-
-        distances = []
-        for i,task_classes in enumerate(sampled_classes):
-            task_distances = []
-            z_q = test_embs[i] # this one is the same for all classes, differs only per task
-            for label in task_classes:
-                indices = np.where(enroll_labels[i] == label)
-                # ALL THESE ARE FOR CLASS l (label)
-                z_s = enroll_embs[i][indices]
-                
-                N_samples_SQ = len(indices[0])+z_q.shape[0]
-                N_samples_S = len(indices[0])
-                
-                w_sq = (z_s.sum(axis=0).squeeze() + z_q.sum(axis=0).squeeze()) / N_samples_SQ
-                w_sq = np.expand_dims(w_sq,0)
-                
-                w_s = z_s.sum(axis=0).squeeze() / N_samples_S
-                w_s = np.expand_dims(w_s,0)
-                
-                dist_w_sq_support = np.sum((w_sq-z_s)**2,axis=0)
-                dist_w_s_support = np.sum((w_s-z_s)**2,axis=0)
-                dist_w_sq_query = np.sum((w_sq-z_q)**2,axis=0)
-                
-                final_distance = dist_w_sq_query + dist_w_sq_support - dist_w_s_support
-
-                task_distances.append(final_distance)
-            distances.append(task_distances)
-
-        distances = np.asarray(distances)
-
-        return distances
-
+        return final_distance
 
     def inductive(self,enroll_embs,enroll_labels,test_embs,test_labels):
         """
@@ -226,7 +174,7 @@ class Simpleshot():
         return pred_labels, pred_labels_top5
 
 
-    def transductive_centroid(self,enroll_embs,enroll_labels,test_embs,test_labels):
+    def sscd(self,enroll_embs,enroll_labels,test_embs,test_labels):
         """
         enroll_embs: [n_tasks,k_shot*n_ways,192]
         enroll_labels: [n_tasks,k_shot*n_ways]
@@ -243,7 +191,7 @@ class Simpleshot():
         avg_enroll_embs = torch.from_numpy(avg_enroll_embs).float().to(self.device)
         
         if self.backend == "cosine":
-            print("Using SimpleShot transductive centroid method with cosine similarity backend.")
+            print("Using SSCD method with cosine similarity backend.")
 
             avg_test_embs = avg_test_embs / avg_test_embs.norm(dim=-1, keepdim=True)
             avg_enroll_embs = avg_enroll_embs / avg_enroll_embs.norm(dim=-1, keepdim=True)
@@ -251,7 +199,7 @@ class Simpleshot():
             scores = 1 - torch.einsum('ijk,ilk->ijl', avg_test_embs, avg_enroll_embs).repeat(1,n_query,1)
 
         else:
-            print("Using SimpleShot transductive centroid method with L2 norm backend.")
+            print("Using SSCD method with L2 norm backend.")
 
             #avg_test_embs = torch.unsqueeze(avg_test_embs,2)
             #avg_enroll_embs = torch.unsqueeze(avg_enroll_embs,1) # [n_tasks,1,1251,emb_shape]
@@ -268,45 +216,17 @@ class Simpleshot():
 
         return pred_labels, pred_labels_top5
     
-    def estimation_maximization(self,enroll_embs,enroll_labels,test_embs,test_labels):
-        print("Using Estimation maximization method")
+    def fsaic(self,enroll_embs,enroll_labels,test_embs,test_labels, method='centroid'):
+        print("Using FSAiC method")
         n_query = test_embs.shape[1]
         
-        device_here = torch.device('cuda:0')
-        
-        dist = torch.from_numpy(self.calculate_sq_z_dist(enroll_embs, test_embs,enroll_labels))
+        dist = torch.from_numpy(self.calculate_sq_z_dist(enroll_embs, test_embs, enroll_labels,method))
         C_l = torch.sum(dist,dim=-1)
         pred_labels = torch.argmin(C_l,-1).unsqueeze(1).repeat(1,n_query).to(torch.device('cpu'))
         _,pred_labels_top5 = torch.topk(C_l, k=5, dim=1, largest=False)
         
         return pred_labels,pred_labels_top5
-    
-    def estimation_maximization_normal(self,enroll_embs,enroll_labels,test_embs,test_labels):
-        print("Using Estimation maximization method")
-        n_query = test_embs.shape[1]
-        
-        device_here = torch.device('cuda:0')
-        
-        dist = torch.from_numpy(self.calculate_sq_z_dist_normal(enroll_embs, test_embs,enroll_labels))
-        C_l = torch.sum(dist,dim=-1)
-        pred_labels = torch.argmin(C_l,-1).unsqueeze(1).repeat(1,n_query).to(torch.device('cpu'))
-        _,pred_labels_top5 = torch.topk(C_l, k=5, dim=1, largest=False)
-        
-        return pred_labels,pred_labels_top5
-    
-    def estimation_maximization_frobenius(self,enroll_embs,enroll_labels,test_embs,test_labels):
-        print("Using Estimation maximization method")
-        n_query = test_embs.shape[1]
-        
-        device_here = torch.device('cuda:0')
-        
-        dist = torch.from_numpy(self.calculate_sq_z_dist_frobenius(enroll_embs, test_embs,enroll_labels))
-        C_l = torch.sum(dist,dim=-1)
-        pred_labels = torch.argmin(C_l,-1).unsqueeze(1).repeat(1,n_query).to(torch.device('cpu'))
-        _,pred_labels_top5 = torch.topk(C_l, k=5, dim=1, largest=False)
-        
-        return pred_labels,pred_labels_top5
-
+   
 def compute_acc(pred_labels, test_labels):
     # Check if the input tensors have the same shape
     assert pred_labels.shape == test_labels.shape, "Shape mismatch between predicted and groundtruth labels"
