@@ -8,6 +8,7 @@ import time
 from utils.task_generator import Tasks_Generator
 from tqdm import tqdm
 from methods.simpleshot import Simpleshot
+from methods.fsaic import FSAIC
 from methods.methods import run_paddle_new,run_2stage_paddle
 import os 
 from utils.utils import CL2N_embeddings,embedding_normalize,embs_norm_both
@@ -97,26 +98,25 @@ for k_shot in k_shots:
                                 enroll_embs[start:end],
                                 enroll_labels[start:end])
                 
-                eval = Simpleshot(avg="mean",backend="cosine",method="ss")
+                eval = Simpleshot(avg="mean",backend="L2",method="ss")
                 acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end]) 
                 acc["ss"].extend(acc_list)
                 
                 if n_ways_eff == 1:
-                    eval = Simpleshot(avg="mean",backend="cosine",method="smv")
+                    eval = Simpleshot(avg="mean",backend="L2",method="smv")
                     acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end]) 
                     acc["smv"].extend(acc_list)
 
-                    eval = Simpleshot(avg="mean",backend="L2",method="fsaic")
+                    eval = FSAIC(method="normal")
                     acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end]) 
                     acc["fsaic"].extend(acc_list)
                 
-                    eval = Simpleshot(avg="mean",backend="L2",method="fsaic_centroid")
+                    eval = FSAIC(method="centroid")
                     acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end])
                     acc["fsaic_centroid"].extend(acc_list)
                     acc["fsaic_centroid_5"].extend(acc_list_5)
-                    print(pred_labels_5)
                     
-                    eval = Simpleshot(avg="mean",backend="L2",method="sscd")
+                    eval = Simpleshot(avg="mean",backend="cosine",method="sscd")
                     acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end]) 
                     acc['sscd'].extend(acc_list)
                     acc['sscd_5'].extend(acc_list_5)
