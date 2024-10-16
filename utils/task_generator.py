@@ -1,7 +1,6 @@
 import torch
 import numpy as np
 import random
-from omegaconf import OmegaConf
 from utils.utils import find_matching_positions
 from tqdm import tqdm
 import time
@@ -42,17 +41,12 @@ class Tasks_Generator:
             # Query classes must be part of the sampled support classes
             self.query_classes.append(sorted(random.sample(sampled_classes, n_ways_eff)))
         
-        #print(self.support_classes)
-        #print(self.query_classes)
-    
     def sampler(self, data_dict, mode):
         """
         Every time I sample, I set the seed.. sometimes it doesn't pick the same samples 
         when I use the sampler second time with a different batch size. 
         Setting the seed everytime removes this problem
-        """
-        #set_seed(self.seed)
-        """
+        
         There are 2 modes: query and support. Depending on the mode, we either load the sampled support/query classes for n_tasks
         """
         out_embs = []

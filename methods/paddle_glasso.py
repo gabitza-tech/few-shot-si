@@ -93,7 +93,6 @@ class KM(object):
         counts = one_hot.sum(1).view(n_tasks, -1, 1)
         weights = one_hot.transpose(1, 2).matmul(support)
         self.w = weights / counts
-        self.w = self.w / self.w.norm(dim=-1, keepdim=True)
 
     def record_convergence(self, new_time, criterions):
         """
@@ -257,7 +256,6 @@ class PADDLE_GLASSO(KM):
             num += gamma*(support.unsqueeze(2) * y_s_one_hot.unsqueeze(3)).sum(1)
             den  = self.u.sum(1) + gamma*y_s_one_hot.sum(1) 
         self.w = torch.div(num, den.unsqueeze(2)) 
-        self.w = self.w / self.w.norm(dim=-1, keepdim=True)
 
     def s_update(self, support, query, y_s_one_hot):
         den = ((query.unsqueeze(2) - self.w.unsqueeze(1))**2 * self.u.unsqueeze(3)).sum(1) + 1e-6

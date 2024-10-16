@@ -35,7 +35,7 @@ args['iter']=30
 
 use_mean = sys.argv[3]
 
-n_queries =[5,3,1]
+n_queries =[1,3,5]
 k_shots = [int(sys.argv[4])]
 n_ways_effs = [1]
 
@@ -53,6 +53,7 @@ for k_shot in k_shots:
 
             # we set alpha value to the number of samples in query
             alpha = n_query
+            alpha_glasso = 1000
 
             acc = {}
             acc["ss"] = []
@@ -70,7 +71,7 @@ for k_shot in k_shots:
             acc['paddle_2stage'] = {}
             acc["paddle"][str(alpha)] = []
             acc['paddle_maj'][str(alpha)] = []
-            acc['paddle_2stage'][str(alpha)] = []
+            acc['paddle_2stage'][str(alpha_glasso)] = []
 
             out_filename = f'k_{k_shot}_neff_{n_ways_eff}_nq_{n_query}.json'
             out_file = os.path.join(out_dir,out_filename)
@@ -116,11 +117,10 @@ for k_shot in k_shots:
                     acc["fsaic_centroid"].extend(acc_list)
                     acc["fsaic_centroid_5"].extend(acc_list_5)
                     
-                    eval = Simpleshot(avg="mean",backend="cosine",method="sscd")
+                    eval = Simpleshot(avg="mean",backend="L2",method="sscd")
                     acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end]) 
                     acc['sscd'].extend(acc_list)
                     acc['sscd_5'].extend(acc_list_5)
-                    print(pred_labels_5)
                 
                 else:
                     eval = Simpleshot(avg="mean",backend="cosine",method="ss")
@@ -143,16 +143,14 @@ for k_shot in k_shots:
                 acc_list,_ = run_paddle_new(x_s, y_s, x_q, y_q,method_info,'paddle')                
                 acc['paddle_maj'][str(alpha)].extend(acc_list)
 
-                args['alpha'] = alpha
+                args['alpha'] = alpha_glasso
                 method_info = {'device':'cuda','args':args}
                 if n_ways_eff == 1:
                     try:
-                        acc_list = run_2stage_paddle(x_s, y_s, x_q, y_q, test_audios[start:end], method_info)                
-                        acc['paddle_2stage'][str(alpha)].extend(acc_list)
+                        acc_list = run_2stage_paddle(x_s, y_s, x_q, y_q, test_audios[start:end], method_info)
+                        acc['paddle_2stage'][str(alpha_glasso)].extend(acc_list)
                     except:
-                        #continue
-                        pass   
-
+                        continue
             
 
             final_json = {}
@@ -168,12 +166,14 @@ for k_shot in k_shots:
 
             final_json['paddle_maj'] = {}
             final_json['paddle_maj'][str(alpha)] = 100*sum(acc["paddle_maj"][str(alpha)])/len(acc["paddle_maj"][str(alpha)])
+            with open(out_file, 'w') as f:
+                json.dump(final_json,f)
 
             try:
-                final_json['paddle_2stage'][str(alpha)] = 100*sum(acc["paddle_2stage"][str(alpha)])/len(acc["paddle_2stage"][str(alpha)])
+                final_json['paddle_2stage'] = {}
+                final_json['paddle_2stage'][str(alpha_glasso)] = 100*sum(acc['paddle_2stage'][str(alpha_glasso)])/len(acc['paddle_2stage'][str(alpha_glasso)])
             except:
-                #continue
-                pass
+                continue
 
             with open(out_file,'w') as f:
                 json.dump(final_json,f)
