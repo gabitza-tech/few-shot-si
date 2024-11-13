@@ -131,7 +131,6 @@ class KM(object):
             accuracy = (preds_q == y_q).float().mean(1, keepdim=True)
         
         self.test_acc.append(accuracy)
-        self.test_acc.append(accuracy)
 
         return groundtruth, predictions, confidences
 
