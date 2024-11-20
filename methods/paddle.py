@@ -78,11 +78,9 @@ class KM(object):
         y_q = y_q.to(torch.device('cpu'))
 
         if self.maj_vote:
-            
             preds_q_maj = majority_or_original(preds_q)
             accuracy = (preds_q_maj == y_q).float().mean(1, keepdim=True)
             self.preds_q.append(preds_q_maj)
-
         else:
             accuracy = (preds_q == y_q).float().mean(1, keepdim=True)
         

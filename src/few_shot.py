@@ -9,7 +9,7 @@ from utils.task_generator import Tasks_Generator
 from tqdm import tqdm
 from methods.simpleshot import Simpleshot
 from methods.fsaic import FSAIC
-from methods.methods import run_paddle_new,run_2stage_paddle
+from methods.methods import run_method, run_2stage_method#run_paddle_new,run_2stage_paddle
 import os 
 from utils.utils import CL2N_embeddings,embedding_normalize,embs_norm_both
 import sys

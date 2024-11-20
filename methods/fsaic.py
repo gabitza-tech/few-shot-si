@@ -8,9 +8,10 @@ import random
 
 class FSAIC():
 
-    def __init__(self, device='cpu', method="centroid"):
+    def __init__(self, device='cpu', method="centroid",top_k=5):
         self.device = torch.device(device)
         self.method = method
+        self.top_k = top_k
 
     def eval(self,enroll_embs,enroll_labels,test_embs,test_labels, test_audios):
 
@@ -105,7 +106,7 @@ class FSAIC():
         C_l = torch.sum(dist,dim=-1)
 
         pred_labels = torch.argmin(C_l,-1).unsqueeze(1).repeat(1,n_query).to(torch.device('cpu'))
-        _,pred_labels_top5 = torch.topk(C_l, k=5, dim=-1, largest=False)
+        _,pred_labels_top5 = torch.topk(C_l, k=self.top_k, dim=-1, largest=False)
         pred_labels_top5 = pred_labels_top5.unsqueeze(1).repeat(1,n_query,1).to(torch.device('cpu'))
 
         return pred_labels,pred_labels_top5
