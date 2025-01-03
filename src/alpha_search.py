@@ -9,6 +9,7 @@ from utils.task_generator import Tasks_Generator
 from tqdm import tqdm
 from methods.simpleshot import Simpleshot
 from methods.fsaic import FSAIC
+from methods.fsaic_tunable import FSAIC_tunable
 from methods.methods import run_2stage_method,run_method
 import os 
 from utils.utils import CL2N_embeddings,embedding_normalize,embs_norm_both
@@ -30,9 +31,9 @@ if not os.path.exists(out_dir):
     os.mkdir(out_dir)
 
 seed = 42
-n_tasks = 10#000
-batch_size = 10#000
-top_k = 5
+n_tasks = 50#000
+batch_size = 50
+top_k = 10
 
 normalize = True
 use_mean = False
@@ -42,16 +43,17 @@ torch.manual_seed(seed)
 np.random.seed(seed)
 
 #alphas = [5]#[i for i in range(0,20)]#[i for i in range(0, 16) if i % 3 == 0 or i % 5 == 0]
+alphas_fsaic = [2]#[0.1,0.3,0.5,0.7,0.9,1,1.1,1.3,1.5,1.8,2,2.5,3,3.5,4]
 alphas_glasso = [1000]#[100,1000,10000]#[0,10,100,1000,10000,100000,1000000]
 alphas_tim = [100]#[0,1,10,50,100,200,300,400,500,600,700,800,900,1000]
 lmds = [0.9]#[0.9,0.8,0.7,0.6,0.5,0.3,0.2,0.1,0.05,0.01,0.001]
+
 n_queries = [5,3]#,3,1]
 k_shots = [5,3,1]#,3,1]
 n_ways_effs = [1]
 
 #uniq_classes = sorted(list(set(enroll_dict['concat_labels'])))
 uniq_classes = sorted(list(set(merged_dict['concat_labels'])))
-
 
 for k_shot in k_shots:
     for n_ways_eff in n_ways_effs:
@@ -61,7 +63,6 @@ for k_shot in k_shots:
 
             out_filename = f'k_{k_shot}_neff_{n_ways_eff}_nq_{n_query}.json'
             out_file = os.path.join(out_dir,out_filename)
-            
             task_generator = Tasks_Generator(uniq_classes=uniq_classes,
                                                 n_tasks=n_tasks,
                                                 n_ways=len(uniq_classes),
@@ -74,9 +75,10 @@ for k_shot in k_shots:
             #enroll_embs, enroll_labels, enroll_audios = task_generator.sampler(enroll_dict,mode='support')
             test_embs, test_labels, test_audios, enroll_embs, enroll_labels, enroll_audios = task_generator.sampler_unified(merged_dict)
             
-            enroll_embs, test_embs = CL2N_embeddings(enroll_embs,test_embs,use_mean=use_mean)
-            #test_embs = embedding_normalize(test_embs,use_mean=False)#True)
-            #enroll_embs = embedding_normalize(enroll_embs,use_mean=False)#True)
+            if normalize:
+                enroll_embs, test_embs = CL2N_embeddings(enroll_embs,test_embs,use_mean=use_mean)
+                #test_embs = embedding_normalize(test_embs,use_mean=False)#True)
+                #enroll_embs = embedding_normalize(enroll_embs,use_mean=False)#True)
 
             acc = {}
             acc["ss"] = []
@@ -86,9 +88,20 @@ for k_shot in k_shots:
             acc["fsaic"] = []
             acc["fsaic_centroid"] = []
             acc["fsaic_centroid_5"] = []
+            acc["normal_mahalanobis"] = []
+            acc["centroid_mahalanobis"] = []
+            acc["centroid_mahalanobis_5"] = []
+            acc["unnormalized_normal_mahalanobis"] = []
+            acc["unnormalized_centroid_mahalanobis"] = []
+            acc["unnormalized_centroid_mahalanobis_5"] = []
+            acc["mahalanobis_cd"] = []
+            acc["mahalanobis_cd_5"] = []
+            acc["unnormalized_mahalanobis_cd"] = []
+            acc["unnormalized_mahalanobis_cd_5"] = []
             acc['hard_em_dirichlet'] = []
             
-            
+            acc["fsaic_tunable"] = {}
+            acc["fsaic_tunable_centroid"] = {}
             acc["paddle"] = {}
             acc['paddle_2stage'] = {}
             acc['tim'] = {}
@@ -98,6 +111,10 @@ for k_shot in k_shots:
             
             for alpha in alphas:
                 acc["paddle"][str(alpha)] = []
+            for alpha in alphas_fsaic:
+                acc["fsaic_tunable"][str(alpha)] = []
+            for alpha in alphas_fsaic:
+                acc["fsaic_tunable_centroid"][str(alpha)] = []
             for alpha_glasso in alphas_glasso:
                 acc['paddle_2stage'][str(alpha_glasso)] = []
             for alpha in alphas_tim:
@@ -126,9 +143,14 @@ for k_shot in k_shots:
                     eval = Simpleshot(avg="mean",backend="L2",method="smv")
                     acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end]) 
                     acc["smv"].extend(acc_list)
-
-                    eval = FSAIC(method="normal")
+                    
+                    eval = Simpleshot(avg="mean",backend="L2",method="sscd")
                     acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end]) 
+                    acc['sscd'].extend(acc_list)
+                    acc['sscd_5'].extend(acc_list_5)
+                    
+                    eval = FSAIC(method="normal")
+                    acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end])
                     acc["fsaic"].extend(acc_list)
                 
                     eval = FSAIC(method="centroid")
@@ -136,10 +158,33 @@ for k_shot in k_shots:
                     acc["fsaic_centroid"].extend(acc_list)
                     acc["fsaic_centroid_5"].extend(acc_list_5)
                     
-                    eval = Simpleshot(avg="mean",backend="L2",method="sscd")
-                    acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end]) 
-                    acc['sscd'].extend(acc_list)
-                    acc['sscd_5'].extend(acc_list_5)
+                    eval = FSAIC(method="normal_mahalanobis")
+                    acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end])
+                    acc["normal_mahalanobis"].extend(acc_list)
+                
+                    eval = FSAIC(method="centroid_mahalanobis")
+                    acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end])
+                    acc["centroid_mahalanobis"].extend(acc_list)
+                    acc["centroid_mahalanobis_5"].extend(acc_list_5)
+                    
+                    eval = FSAIC(method="unnormalized_normal_mahalanobis")
+                    acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end])
+                    acc["unnormalized_normal_mahalanobis"].extend(acc_list)
+                
+                    eval = FSAIC(method="unnormalized_centroid_mahalanobis")
+                    acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end])
+                    acc["unnormalized_centroid_mahalanobis"].extend(acc_list)
+                    acc["unnormalized_centroid_mahalanobis_5"].extend(acc_list_5)
+                    
+                    eval = FSAIC(method="mahalanobis_cd")
+                    acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end])
+                    acc["mahalanobis_cd"].extend(acc_list)
+                    acc["mahalanobis_cd_5"].extend(acc_list_5)
+                    
+                    eval = FSAIC(method="unnormalized_mahalanobis_cd")
+                    acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end])
+                    acc["unnormalized_mahalanobis_cd"].extend(acc_list)
+                    acc["unnormalized_mahalanobis_cd_5"].extend(acc_list_5) 
                 
                 else:
                     eval = Simpleshot(avg="mean",backend="cosine",method="ss")
@@ -159,6 +204,18 @@ for k_shot in k_shots:
                 acc['hard_em_dirichlet'].extend(acc_list)
                 """
                 
+                #for alpha in alphas_fsaic:
+                #    print("Doing FSAIC tunable")
+                #    eval = FSAIC_tunable(method="centroid",alpha=alpha)
+                #    acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end]) 
+                #    acc["fsaic_tunable_centroid"][str(alpha)].extend(acc_list)
+                    
+                #    print("Doing FSAIC tunable")
+                #    eval = FSAIC_tunable(method="normal",alpha=alpha)
+                #    acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end]) 
+                #    acc["fsaic_tunable"][str(alpha)].extend(acc_list)
+                
+                
                 for alpha in alphas:
                     print("Doing PADDLE")
                     args = {}
@@ -174,6 +231,8 @@ for k_shot in k_shots:
                     acc_list,_ = run_method(x_s, y_s, x_q, y_q,method_info,'paddle')
                     acc['paddle'][str(alpha)].extend(acc_list)
                 
+                continue
+                
                 for lmd in lmds:
                     print("Doing LaplacianShot")
                     args ={}
@@ -188,7 +247,7 @@ for k_shot in k_shots:
                     acc['laplacianshot'][str(lmd)].extend(acc_list)
                     acc_list = run_2stage_method(x_s, y_s, x_q, y_q, test_audios[start:end], method_info,'laplacianshot',top_k)                
                     acc['laplacianshot_2stage'][str(lmd)].extend(acc_list)
-                    
+
                 for alpha_tim in alphas_tim:
                     print("Doing Alpha-TIM")
                     args = {}
@@ -233,23 +292,39 @@ for k_shot in k_shots:
             final_json['fsaic'] = 100*sum(acc["fsaic"])/len(acc["fsaic"])
             final_json['fsaic_centroid'] = 100*sum(acc["fsaic_centroid"])/len(acc["fsaic_centroid"])
             final_json['fsaic_centroid_5'] = 100*sum(acc["fsaic_centroid_5"])/len(acc["fsaic_centroid_5"])
+            final_json['normal_mahalanobis'] = 100*sum(acc["normal_mahalanobis"])/len(acc["normal_mahalanobis"])
+            final_json['centroid_mahalanobis'] = 100*sum(acc["centroid_mahalanobis"])/len(acc["centroid_mahalanobis"])
+            final_json['centroid_mahalanobis_5'] = 100*sum(acc["centroid_mahalanobis_5"])/len(acc["centroid_mahalanobis_5"])
+            final_json['unnormalized_normal_mahalanobis'] = 100*sum(acc["unnormalized_normal_mahalanobis"])/len(acc["unnormalized_normal_mahalanobis"])
+            final_json['unnormalized_centroid_mahalanobis'] = 100*sum(acc["unnormalized_centroid_mahalanobis"])/len(acc["unnormalized_centroid_mahalanobis"])
+            final_json['unnormalized_centroid_mahalanobis_5'] = 100*sum(acc["unnormalized_centroid_mahalanobis_5"])/len(acc["unnormalized_centroid_mahalanobis_5"])
+            final_json['mahalanobis_cd'] = 100*sum(acc["mahalanobis_cd"])/len(acc["mahalanobis_cd"])
+            final_json['mahalanobis_cd_5'] = 100*sum(acc["mahalanobis_cd_5"])/len(acc["mahalanobis_cd_5"])
+            final_json['unnormalized_mahalanobis_cd'] = 100*sum(acc["unnormalized_mahalanobis_cd"])/len(acc["unnormalized_mahalanobis_cd"])
+            final_json['unnormalized_mahalanobis_cd_5'] = 100*sum(acc["unnormalized_mahalanobis_cd_5"])/len(acc["unnormalized_mahalanobis_cd_5"])
             #final_json['hard_em_dirichlet'] = 100*sum(acc["hard_em_dirichlet"])/len(acc["hard_em_dirichlet"])
             
+            #final_json['fsaic_tunable'] = {}
+            #final_json['fsaic_tunable_centroid'] = {}
             final_json['paddle'] = {}
             #final_json['paddle_2stage'] = {}
-            final_json['tim'] = {}
-            final_json['tim_2stage'] = {}
-            final_json['laplacianshot'] = {}
-            final_json['laplacianshot_2stage'] = {}    
+            #final_json['tim'] = {}
+            #final_json['tim_2stage'] = {}
+            #final_json['laplacianshot'] = {}
+            #final_json['laplacianshot_2stage'] = {}    
 
             for alpha in alphas:
                 final_json['paddle'][str(alpha)] = 100*sum(acc["paddle"][str(alpha)])/len(acc["paddle"][str(alpha)])
-            for alpha in alphas_tim:
-                final_json['tim'][str(alpha)] = 100*sum(acc["tim"][str(alpha)])/len(acc["tim"][str(alpha)])
-                final_json['tim_2stage'][str(alpha)] = 100*sum(acc["tim_2stage"][str(alpha)])/len(acc["tim_2stage"][str(alpha)])
-            for lmd in lmds:
-                final_json['laplacianshot'][str(lmd)] = 100*sum(acc["laplacianshot"][str(lmd)])/len(acc["laplacianshot"][str(lmd)])
-                final_json['laplacianshot_2stage'][str(lmd)] = 100*sum(acc["laplacianshot_2stage"][str(lmd)])/len(acc["laplacianshot_2stage"][str(lmd)])
+            #for alpha in alphas_fsaic:
+            #    final_json['fsaic_tunable'][str(alpha)] = 100*sum(acc["fsaic_tunable"][str(alpha)])/len(acc["fsaic_tunable"][str(alpha)])
+            #for alpha in alphas_fsaic:
+            #    final_json['fsaic_tunable_centroid'][str(alpha)] = 100*sum(acc["fsaic_tunable_centroid"][str(alpha)])/len(acc["fsaic_tunable_centroid"][str(alpha)])
+            #for alpha in alphas_tim:
+            #    final_json['tim'][str(alpha)] = 100*sum(acc["tim"][str(alpha)])/len(acc["tim"][str(alpha)])
+            #    final_json['tim_2stage'][str(alpha)] = 100*sum(acc["tim_2stage"][str(alpha)])/len(acc["tim_2stage"][str(alpha)])
+            #for lmd in lmds:
+            #    final_json['laplacianshot'][str(lmd)] = 100*sum(acc["laplacianshot"][str(lmd)])/len(acc["laplacianshot"][str(lmd)])
+            #    final_json['laplacianshot_2stage'][str(lmd)] = 100*sum(acc["laplacianshot_2stage"][str(lmd)])/len(acc["laplacianshot_2stage"][str(lmd)])
                 
             #for alpha in alphas_glasso:
             #    if k_shot == 1:
