@@ -22,25 +22,18 @@ import sys
 dataset_file = sys.argv[1]#'embeddings_cn2_vox2/cnceleb1_test.pkl'
 merged_dict = np.load(dataset_file,allow_pickle=True)
 
-#dev_file = 'embeddings_vox2/voxceleb1_dev.pkl'
-#dev_dict = np.load(dev_file, allow_pickle=True)
-#dev_mean = np.mean(dev_dict['concat_features'],axis=0)
-
 out_dir = sys.argv[2]
+print(out_dir)
 if not os.path.exists(out_dir):
     os.mkdir(out_dir)
 
 seed = 42
-n_tasks = 50#000
+n_tasks = 100
 batch_size = 50
-top_k = 10
+top_k = 5
 
 normalize = True
 use_mean = False
-
-random.seed(seed)
-torch.manual_seed(seed)
-np.random.seed(seed)
 
 #alphas = [5]#[i for i in range(0,20)]#[i for i in range(0, 16) if i % 3 == 0 or i % 5 == 0]
 alphas_fsaic = [2]#[0.1,0.3,0.5,0.7,0.9,1,1.1,1.3,1.5,1.8,2,2.5,3,3.5,4]
@@ -48,8 +41,8 @@ alphas_glasso = [1000]#[100,1000,10000]#[0,10,100,1000,10000,100000,1000000]
 alphas_tim = [100]#[0,1,10,50,100,200,300,400,500,600,700,800,900,1000]
 lmds = [0.9]#[0.9,0.8,0.7,0.6,0.5,0.3,0.2,0.1,0.05,0.01,0.001]
 
-n_queries = [5,3]#,3,1]
-k_shots = [5,3,1]#,3,1]
+n_queries = [5,3,1]
+k_shots = [5,3,1]
 n_ways_effs = [1]
 
 #uniq_classes = sorted(list(set(enroll_dict['concat_labels'])))
@@ -58,6 +51,9 @@ uniq_classes = sorted(list(set(merged_dict['concat_labels'])))
 for k_shot in k_shots:
     for n_ways_eff in n_ways_effs:
         for n_query in n_queries:
+            random.seed(seed)
+            torch.manual_seed(seed)
+            np.random.seed(seed)
 
             alphas = [n_query]
 
@@ -77,8 +73,6 @@ for k_shot in k_shots:
             
             if normalize:
                 enroll_embs, test_embs = CL2N_embeddings(enroll_embs,test_embs,use_mean=use_mean)
-                #test_embs = embedding_normalize(test_embs,use_mean=False)#True)
-                #enroll_embs = embedding_normalize(enroll_embs,use_mean=False)#True)
 
             acc = {}
             acc["ss"] = []
@@ -88,17 +82,10 @@ for k_shot in k_shots:
             acc["fsaic"] = []
             acc["fsaic_centroid"] = []
             acc["fsaic_centroid_5"] = []
-            acc["normal_mahalanobis"] = []
-            acc["centroid_mahalanobis"] = []
-            acc["centroid_mahalanobis_5"] = []
-            acc["unnormalized_normal_mahalanobis"] = []
-            acc["unnormalized_centroid_mahalanobis"] = []
-            acc["unnormalized_centroid_mahalanobis_5"] = []
-            acc["mahalanobis_cd"] = []
-            acc["mahalanobis_cd_5"] = []
-            acc["unnormalized_mahalanobis_cd"] = []
-            acc["unnormalized_mahalanobis_cd_5"] = []
-            acc['hard_em_dirichlet'] = []
+            acc["normal_mahalanobis_latesum"] = []
+            acc["normal_mahalanobis_latesum_5"] = []
+            acc["mahalanobis_cd_latesum"] = []
+            acc["mahalanobis_cd_latesum_5"] = []
             
             acc["fsaic_tunable"] = {}
             acc["fsaic_tunable_centroid"] = {}
@@ -158,34 +145,18 @@ for k_shot in k_shots:
                     acc["fsaic_centroid"].extend(acc_list)
                     acc["fsaic_centroid_5"].extend(acc_list_5)
                     
-                    eval = FSAIC(method="normal_mahalanobis")
+                    eval = FSAIC(method="normal_mahalanobis_latesum")
                     acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end])
-                    acc["normal_mahalanobis"].extend(acc_list)
-                
-                    eval = FSAIC(method="centroid_mahalanobis")
-                    acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end])
-                    acc["centroid_mahalanobis"].extend(acc_list)
-                    acc["centroid_mahalanobis_5"].extend(acc_list_5)
+                    acc["normal_mahalanobis_latesum"].extend(acc_list)
+                    acc["normal_mahalanobis_latesum_5"].extend(acc_list_5)
                     
-                    eval = FSAIC(method="unnormalized_normal_mahalanobis")
+                    eval = FSAIC(method="mahalanobis_cd_latesum")
                     acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end])
-                    acc["unnormalized_normal_mahalanobis"].extend(acc_list)
-                
-                    eval = FSAIC(method="unnormalized_centroid_mahalanobis")
-                    acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end])
-                    acc["unnormalized_centroid_mahalanobis"].extend(acc_list)
-                    acc["unnormalized_centroid_mahalanobis_5"].extend(acc_list_5)
-                    
-                    eval = FSAIC(method="mahalanobis_cd")
-                    acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end])
-                    acc["mahalanobis_cd"].extend(acc_list)
-                    acc["mahalanobis_cd_5"].extend(acc_list_5)
-                    
-                    eval = FSAIC(method="unnormalized_mahalanobis_cd")
-                    acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end])
-                    acc["unnormalized_mahalanobis_cd"].extend(acc_list)
-                    acc["unnormalized_mahalanobis_cd_5"].extend(acc_list_5) 
-                
+                    acc["mahalanobis_cd_latesum"].extend(acc_list)
+                    acc["mahalanobis_cd_latesum_5"].extend(acc_list_5)
+
+                    duration = time.time() - start_time
+                    print(f"Duration is: {duration} s")
                 else:
                     eval = Simpleshot(avg="mean",backend="cosine",method="ss")
                     acc_list,_,_ = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end]) 
@@ -292,17 +263,10 @@ for k_shot in k_shots:
             final_json['fsaic'] = 100*sum(acc["fsaic"])/len(acc["fsaic"])
             final_json['fsaic_centroid'] = 100*sum(acc["fsaic_centroid"])/len(acc["fsaic_centroid"])
             final_json['fsaic_centroid_5'] = 100*sum(acc["fsaic_centroid_5"])/len(acc["fsaic_centroid_5"])
-            final_json['normal_mahalanobis'] = 100*sum(acc["normal_mahalanobis"])/len(acc["normal_mahalanobis"])
-            final_json['centroid_mahalanobis'] = 100*sum(acc["centroid_mahalanobis"])/len(acc["centroid_mahalanobis"])
-            final_json['centroid_mahalanobis_5'] = 100*sum(acc["centroid_mahalanobis_5"])/len(acc["centroid_mahalanobis_5"])
-            final_json['unnormalized_normal_mahalanobis'] = 100*sum(acc["unnormalized_normal_mahalanobis"])/len(acc["unnormalized_normal_mahalanobis"])
-            final_json['unnormalized_centroid_mahalanobis'] = 100*sum(acc["unnormalized_centroid_mahalanobis"])/len(acc["unnormalized_centroid_mahalanobis"])
-            final_json['unnormalized_centroid_mahalanobis_5'] = 100*sum(acc["unnormalized_centroid_mahalanobis_5"])/len(acc["unnormalized_centroid_mahalanobis_5"])
-            final_json['mahalanobis_cd'] = 100*sum(acc["mahalanobis_cd"])/len(acc["mahalanobis_cd"])
-            final_json['mahalanobis_cd_5'] = 100*sum(acc["mahalanobis_cd_5"])/len(acc["mahalanobis_cd_5"])
-            final_json['unnormalized_mahalanobis_cd'] = 100*sum(acc["unnormalized_mahalanobis_cd"])/len(acc["unnormalized_mahalanobis_cd"])
-            final_json['unnormalized_mahalanobis_cd_5'] = 100*sum(acc["unnormalized_mahalanobis_cd_5"])/len(acc["unnormalized_mahalanobis_cd_5"])
-            #final_json['hard_em_dirichlet'] = 100*sum(acc["hard_em_dirichlet"])/len(acc["hard_em_dirichlet"])
+            final_json['normal_mahalanobis_latesum'] = 100*sum(acc["normal_mahalanobis_latesum"])/len(acc["normal_mahalanobis_latesum"])
+            final_json['normal_mahalanobis_latesum_5'] = 100*sum(acc["normal_mahalanobis_latesum_5"])/len(acc["normal_mahalanobis_latesum_5"])
+            final_json['mahalanobis_cd_latesum'] = 100*sum(acc["mahalanobis_cd_latesum"])/len(acc["mahalanobis_cd_latesum"])
+            final_json['mahalanobis_cd_latesum_5'] = 100*sum(acc["mahalanobis_cd_latesum_5"])/len(acc["mahalanobis_cd_latesum_5"])
             
             #final_json['fsaic_tunable'] = {}
             #final_json['fsaic_tunable_centroid'] = {}

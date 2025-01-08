@@ -6,23 +6,30 @@ from utils.utils import majority_or_original,embedding_normalize
 import torch.nn.functional as F
 import random
 
-class FSAIC():
+class FSAIC_tunable():
 
-    def __init__(self, device='cpu', method="centroid",top_k=5):
+    def __init__(self, device='cpu', method="centroid",top_k=5, alpha=1):
         self.device = torch.device(device)
         self.method = method
         self.top_k = top_k
+        self.alpha = alpha
 
     def eval(self,enroll_embs,enroll_labels,test_embs,test_labels, test_audios):
 
-        pred_labels, pred_labels_5 = self.fsaic(enroll_embs,enroll_labels,test_embs,test_labels,method=self.method)
+        if self.method == "normal":
+            pred_labels, pred_labels_5 = self.fsaic(enroll_embs,enroll_labels,test_embs,test_labels,method='normal')
+
+        # The FSAiC used in paper!
+        elif self.method == "centroid":
+            pred_labels, pred_labels_5 = self.fsaic(enroll_embs,enroll_labels,test_embs,test_labels,method='centroid')
+
         test_labels = torch.from_numpy(test_labels).long()
 
         acc_tasks = compute_acc(pred_labels, test_labels)
         acc_tasks_5 = compute_acc_5(pred_labels_5, test_labels)
 
         return acc_tasks, acc_tasks_5, pred_labels_5
-
+    
     def calculate_mahalanobis_centroids(self, enroll_embs, test_embs, enroll_labels, method='centroid'):
         # Returns [n_tasks, n_ways, 192] tensor with the centroids
         # sampled_classes: [n_tasks, n_ways]
@@ -57,23 +64,9 @@ class FSAIC():
                 w_sq = (sum_z_s + sum_z_q)
 
                 # Compute covariance and its inverse
-                if method not in ['centroid','normal']:
-                    # Assuming z_s is a PyTorch tensor on the CUDA device
-                    z_s = torch.from_numpy(z_s).cuda()  # Ensure the tensor is on the GPU
+                cov = np.cov(z_s.T) + 1e-6 * np.eye(z_s.shape[1])  # Regularization
+                inv_cov_task.append(np.linalg.inv(cov))
 
-                    # Compute the covariance matrix with regularization
-                    mean_z_s = torch.mean(z_s, dim=0, keepdim=True)
-                    centered_z_s = z_s - mean_z_s
-                    cov = (centered_z_s.T @ centered_z_s) / (z_s.shape[0] - 1) + 1e-6 * torch.eye(z_s.shape[1], device=z_s.device)
-                    z_s = z_s.cpu().numpy()
-                    # Compute the inverse of the covariance matrix
-                    inv_cov_task.append(torch.inverse(cov).cpu().numpy())
-                    
-                    #cov = np.cov(z_s.T) + 1e-6 * np.eye(z_s.shape[1])  # Regularization
-                    #inv_cov_task.append(np.linalg.inv(cov))
-                else:
-                    inv_cov_task.append(0)
-                
                 z_s_task.append(z_s)
                 w_q_task.append(sum_z_q)
                 w_s_task.append(sum_z_s)
@@ -108,34 +101,48 @@ class FSAIC():
             dist_w_sq_support = np.sum((w_sq-z_s)**2,axis=2)
             dist_w_s_support = np.sum((w_s-z_s)**2,axis=2)
             dist_w_sq_query = np.sum((w_sq-w_q)**2,axis=2)
-        
-        elif method == 'normal_mahalanobis_latesum':
-            diff_sq_support = w_sq - z_s
-            diff_s_support = w_s - z_s
-            diff_sq_query = w_sq - test_embs
-
-            dist_w_sq_support = np.sum(np.sum(np.einsum('...ij,...jk->...ik', diff_sq_support, inv_cov_matrices) * diff_sq_support, axis=2,keepdims=True),axis=-1)
-            dist_w_s_support = np.sum(np.sum(np.einsum('...ij,...jk->...ik', diff_s_support, inv_cov_matrices) * diff_s_support, axis=2,keepdims=True),axis=-1)
-            dist_w_sq_query = np.sum(np.sum(np.einsum('...ij,...jk->...ik', diff_sq_query, inv_cov_matrices) * diff_sq_query, axis=2,keepdims=True),axis=-1)
-
-        elif method == 'mahalanobis_latesum':
-            diff_s_query = w_s - test_embs
-            dist_w_s_query = np.sum(np.sum(np.einsum('...ij,...jk->...ik', diff_s_query, inv_cov_matrices) * diff_s_query, axis=2,keepdims=True),axis=-1)
-            final_distance = dist_w_s_query
             
-            return final_distance
-        
-        elif method == 'mahalanobis_cd_latesum':
-            diff_s_query = w_s - w_q
-            dist_w_s_query = np.sum(np.sum(np.einsum('...ij,...jk->...ik', diff_s_query, inv_cov_matrices) * diff_s_query, axis=2,keepdims=True),axis=-1)
-            final_distance = dist_w_s_query
+        elif method == 'normal_mahalanobis':
+            diff_sq_support = np.sum(z_s - w_sq,axis=2,keepdims=True)
+            diff_s_support = np.sum(z_s - w_s,axis=2,keepdims=True)
+            diff_sq_query = np.sum(test_embs - w_sq,axis=2,keepdims=True)
+
+            dist_w_sq_support = np.sum(np.einsum('...ij,...jk->...ik', diff_sq_support, inv_cov_matrices) * diff_sq_support, axis=-1)
+            dist_w_s_support = np.sum(np.einsum('...ij,...jk->...ik', diff_s_support, inv_cov_matrices) * diff_s_support, axis=-1)
+            dist_w_sq_query = np.sum(np.einsum('...ij,...jk->...ik', diff_sq_query, inv_cov_matrices) * diff_sq_query, axis=-1)
+
+        elif method == 'centroid_mahalanobis':  # BETTER
+            diff_sq_support = np.sum(z_s - w_sq,axis=2,keepdims=True)
+            diff_s_support = np.sum(z_s - w_s,axis=2,keepdims=True)
+            diff_sq_query = np.sum(w_q - w_sq,axis=2,keepdims=True)
+
+            dist_w_sq_support = np.sum(np.einsum('...ij,...jk->...ik', diff_sq_support, inv_cov_matrices) * diff_sq_support, axis=-1)
+            dist_w_s_support = np.sum(np.einsum('...ij,...jk->...ik', diff_s_support, inv_cov_matrices) * diff_s_support, axis=-1)
+            dist_w_sq_query = np.sum(np.einsum('...ij,...jk->...ik', diff_sq_query, inv_cov_matrices) * diff_sq_query, axis=-1)
             
-            return final_distance
+        elif method == 'normal_mahalanobis_squared':
+            diff_sq_support = np.sum((z_s - w_sq)**2,axis=2,keepdims=True)
+            diff_s_support = np.sum((z_s - w_s)**2,axis=2,keepdims=True)
+            diff_sq_query = np.sum((test_embs - w_sq)**2,axis=2,keepdims=True)
+
+            dist_w_sq_support = np.sum(np.einsum('...ij,...jk->...ik', diff_sq_support, inv_cov_matrices) * diff_sq_support, axis=-1)
+            dist_w_s_support = np.sum(np.einsum('...ij,...jk->...ik', diff_s_support, inv_cov_matrices) * diff_s_support, axis=-1)
+            dist_w_sq_query = np.sum(np.einsum('...ij,...jk->...ik', diff_sq_query, inv_cov_matrices) * diff_sq_query, axis=-1)
+
+        elif method == 'centroid_mahalanobis_squared':  # BETTER
+            diff_sq_support = np.sum((z_s - w_sq)**2,axis=2,keepdims=True)
+            diff_s_support = np.sum((z_s - w_s)**2,axis=2,keepdims=True)
+            diff_sq_query = np.sum((w_q - w_sq)**2,axis=2,keepdims=True)
+
+            dist_w_sq_support = np.sum(np.einsum('...ij,...jk->...ik', diff_sq_support, inv_cov_matrices) * diff_sq_support, axis=-1)
+            dist_w_s_support = np.sum(np.einsum('...ij,...jk->...ik', diff_s_support, inv_cov_matrices) * diff_s_support, axis=-1)
+            dist_w_sq_query = np.sum(np.einsum('...ij,...jk->...ik', diff_sq_query, inv_cov_matrices) * diff_sq_query, axis=-1)
+
         
         final_distance = dist_w_sq_query + (dist_w_sq_support - dist_w_s_support)
 
         return final_distance
-
+    
     def calculate_fsaic_centroids(self,enroll_embs,test_embs,enroll_labels, method='centroid'):
         # Returns [n_tasks,n_ways,192] tensor with the centroids
         # sampled_classes: [n_tasks,n_ways]
@@ -164,12 +171,11 @@ class FSAIC():
 
                 sum_z_s = z_s.sum(axis=0).squeeze()
                 sum_z_q = z_q.sum(axis=0).squeeze()
-
-                w_sq = (sum_z_s + sum_z_q)
+                w_sq = (sum_z_s + self.alpha * sum_z_q)/(z_s.shape[0] + self.alpha * z_q.shape[0])
 
                 z_s_task.append(z_s)
-                w_q_task.append(sum_z_q)
-                w_s_task.append(sum_z_s)
+                w_q_task.append(sum_z_q/z_q.shape[0])
+                w_s_task.append(sum_z_s/z_s.shape[0])
                 w_sq_task.append(w_sq)
 
             #distances.append(task_distances)
@@ -200,7 +206,9 @@ class FSAIC():
             dist_w_s_support = np.sum((w_s-z_s)**2,axis=2)
             dist_w_sq_query = np.sum((w_sq-w_q)**2,axis=2)
 
-        final_distance = dist_w_sq_query + (dist_w_sq_support - dist_w_s_support)
+        #final_distance = dist_w_sq_query + (dist_w_sq_support - dist_w_s_support)
+        
+        final_distance = (dist_w_sq_support - dist_w_s_support) + self.alpha * dist_w_sq_query
 
         return final_distance
 
@@ -211,7 +219,7 @@ class FSAIC():
         #dist = torch.from_numpy(self.calculate_fsaic_centroids(enroll_embs, test_embs, enroll_labels,method))
         dist = torch.from_numpy(self.calculate_mahalanobis_centroids(enroll_embs, test_embs, enroll_labels,method))
         C_l = torch.sum(dist,dim=-1)
-        print(method)
+
         pred_labels = torch.argmin(C_l,-1).unsqueeze(1).repeat(1,n_query).to(torch.device('cpu'))
         _,pred_labels_top5 = torch.topk(C_l, k=self.top_k, dim=-1, largest=False)
         pred_labels_top5 = pred_labels_top5.unsqueeze(1).repeat(1,n_query,1).to(torch.device('cpu'))
