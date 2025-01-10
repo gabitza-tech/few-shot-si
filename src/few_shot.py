@@ -28,8 +28,8 @@ if not os.path.exists(out_dir):
 
 seed = int(sys.argv[5])
 
-n_tasks = 10000
-batch_size = 50
+n_tasks = 200
+batch_size = 200
 
 args={}
 args['iter']=30
@@ -65,12 +65,14 @@ for k_shot in k_shots:
             acc["fsaic"] = []
             acc["fsaic_centroid"] = []
             acc["fsaic_centroid_5"] = []
-            acc["normal_mahalanobis_latesum"] = []
-            acc["normal_mahalanobis_latesum_5"] = []
-            acc["mahalanobis_latesum"] = []
-            acc["mahalanobis_latesum_5"] = []
+            #acc["normal_mahalanobis_latesum"] = []
+            #acc["normal_mahalanobis_latesum_5"] = []
+            #acc["mahalanobis_latesum"] = []
+            #acc["mahalanobis_latesum_5"] = []
             acc["mahalanobis_cd_latesum"] = []
             acc["mahalanobis_cd_latesum_5"] = []
+            acc["mahalanobis_cd_latesum_wsq"] = []
+            acc["mahalanobis_cd_latesum_wsq_5"] = []
 
             # Paddle methods evaluated
             acc["paddle"] = {}
@@ -121,30 +123,26 @@ for k_shot in k_shots:
                     acc['sscd'].extend(acc_list)
                     acc['sscd_5'].extend(acc_list_5)
 
-                    eval = FSAIC(method="normal")
-                    acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end]) 
-                    acc["fsaic"].extend(acc_list)
+                    #eval = FSAIC(method="normal")
+                    #acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end]) 
+                    #acc["fsaic"].extend(acc_list)
                 
-                    eval = FSAIC(method="centroid")
-                    acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end])
-                    acc["fsaic_centroid"].extend(acc_list)
-                    acc["fsaic_centroid_5"].extend(acc_list_5)
-                    
-                    eval = FSAIC(method="normal_mahalanobis_latesum")
-                    acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end])
-                    acc["normal_mahalanobis_latesum"].extend(acc_list)
-                    acc["normal_mahalanobis_latesum_5"].extend(acc_list_5)
-                    
-                    eval = FSAIC(method="mahalanobis_latesum")
-                    acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end])
-                    acc["mahalanobis_latesum"].extend(acc_list)
-                    acc["mahalanobis_latesum_5"].extend(acc_list_5)
+                    #eval = FSAIC(method="centroid")
+                    #acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end])
+                    #acc["fsaic_centroid"].extend(acc_list)
+                    #acc["fsaic_centroid_5"].extend(acc_list_5)
                     
                     eval = FSAIC(method="mahalanobis_cd_latesum")
                     acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end])
                     acc["mahalanobis_cd_latesum"].extend(acc_list)
                     acc["mahalanobis_cd_latesum_5"].extend(acc_list_5)
-                
+                    
+
+                    eval = FSAIC(method="mahalanobis_cd_latesum_wsq")
+                    acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end])
+                    acc["mahalanobis_cd_latesum_wsq"].extend(acc_list)
+                    acc["mahalanobis_cd_latesum_wsq_5"].extend(acc_list_5)
+                    
                 else:
                     eval = Simpleshot(avg="mean",backend="cosine",method="ss")
                     acc_list,_,_ = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end]) 
@@ -184,15 +182,13 @@ for k_shot in k_shots:
             final_json['smv'] = 100*sum(acc["smv"])/len(acc["smv"])
             final_json['sscd'] = 100*sum(acc["sscd"])/len(acc["sscd"])
             final_json['sscd_5'] = 100*sum(acc["sscd_5"])/len(acc["sscd_5"])
-            final_json['fsaic'] = 100*sum(acc["fsaic"])/len(acc["fsaic"])
-            final_json['fsaic_centroid'] = 100*sum(acc["fsaic_centroid"])/len(acc["fsaic_centroid"])
-            final_json['fsaic_centroid_5'] = 100*sum(acc["fsaic_centroid_5"])/len(acc["fsaic_centroid_5"])
-            final_json['normal_mahalanobis_latesum'] = 100*sum(acc["normal_mahalanobis_latesum"])/len(acc["normal_mahalanobis_latesum"])
-            final_json['normal_mahalanobis_latesum_5'] = 100*sum(acc["normal_mahalanobis_latesum_5"])/len(acc["normal_mahalanobis_latesum_5"])
-            final_json['mahalanobis_latesum'] = 100*sum(acc["mahalanobis_latesum"])/len(acc["mahalanobis_latesum"])
-            final_json['mahalanobis_latesum_5'] = 100*sum(acc["mahalanobis_latesum_5"])/len(acc["mahalanobis_latesum_5"])
+            #final_json['fsaic'] = 100*sum(acc["fsaic"])/len(acc["fsaic"])
+            #final_json['fsaic_centroid'] = 100*sum(acc["fsaic_centroid"])/len(acc["fsaic_centroid"])
+            #final_json['fsaic_centroid_5'] = 100*sum(acc["fsaic_centroid_5"])/len(acc["fsaic_centroid_5"])
             final_json['mahalanobis_cd_latesum'] = 100*sum(acc["mahalanobis_cd_latesum"])/len(acc["mahalanobis_cd_latesum"])
             final_json['mahalanobis_cd_latesum_5'] = 100*sum(acc["mahalanobis_cd_latesum_5"])/len(acc["mahalanobis_cd_latesum_5"])
+            final_json['mahalanobis_cd_latesum_wsq'] = 100*sum(acc["mahalanobis_cd_latesum_wsq"])/len(acc["mahalanobis_cd_latesum_wsq"])
+            final_json['mahalanobis_cd_latesum_wsq_5'] = 100*sum(acc["mahalanobis_cd_latesum_wsq_5"])/len(acc["mahalanobis_cd_latesum_5"])
             
             #final_json['paddle'] = {}
             #final_json['paddle'][str(alpha)] = 100*sum(acc["paddle"][str(alpha)])/len(acc["paddle"][str(alpha)])

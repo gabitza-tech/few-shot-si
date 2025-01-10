@@ -36,15 +36,19 @@ class FSAIC():
         w_sq_all = []
         w_q_all = []
         inv_cov_matrices = []
+        inv_cov_matrices_s = []
+        inv_cov_matrices_q = []
         for i, task_classes in enumerate(sampled_classes):
-            task_distances = []
+            
             # Query samples for task i
             z_q = test_embs[i]
+            
             z_s_task = []
             w_s_task = []
             w_sq_task = []
             w_q_task = []
             inv_cov_task = []
+            inv_cov_task_q = []
             for label in task_classes:
 
                 indices = np.where(enroll_labels[i] == label)
@@ -55,35 +59,53 @@ class FSAIC():
                 sum_z_q = z_q.sum(axis=0).squeeze()
 
                 w_sq = (sum_z_s + sum_z_q)
-
-                # Compute covariance and its inverse
-                if method not in ['centroid','normal']:
-                    # Assuming z_s is a PyTorch tensor on the CUDA device
-                    z_s = torch.from_numpy(z_s).cuda()  # Ensure the tensor is on the GPU
-
-                    # Compute the covariance matrix with regularization
-                    mean_z_s = torch.mean(z_s, dim=0, keepdim=True)
-                    centered_z_s = z_s - mean_z_s
-                    cov = (centered_z_s.T @ centered_z_s) / (z_s.shape[0] - 1) + 1e-6 * torch.eye(z_s.shape[1], device=z_s.device)
-                    z_s = z_s.cpu().numpy()
-                    # Compute the inverse of the covariance matrix
-                    inv_cov_task.append(torch.inverse(cov).cpu().numpy())
-                    
-                    #cov = np.cov(z_s.T) + 1e-6 * np.eye(z_s.shape[1])  # Regularization
-                    #inv_cov_task.append(np.linalg.inv(cov))
-                else:
-                    inv_cov_task.append(0)
                 
                 z_s_task.append(z_s)
                 w_q_task.append(sum_z_q)
                 w_s_task.append(sum_z_s)
                 w_sq_task.append(w_sq)
 
+                # Compute covariance and its inverse
+                if method not in ['centroid','normal']:
+                    if method == "mahalanobis_cd_latesum":# or method == "mahalanobis_cd_latesum_wsq":
+                        # Assuming z_s is a PyTorch tensor on the CUDA device
+                        z_s = torch.from_numpy(z_s).cuda()  # Ensure the tensor is on the GPU
+
+                        # Compute the covariance matrix with regularization
+                        mean_z_s = torch.mean(z_s, dim=0, keepdim=True)
+                        centered_z_s = z_s - mean_z_s
+                        cov = (centered_z_s.T @ centered_z_s) / (z_s.shape[0]) + 1e-6 * torch.eye(z_s.shape[1], device=z_s.device)
+                        
+                        # Compute the inverse of the covariance matrix
+                        inv_cov_task.append(torch.inverse(cov).cpu().numpy())
+                        
+                        #cov = np.cov(z_s.T) + 1e-6 * np.eye(z_s.shape[1])  # Regularization
+                        #inv_cov_task.append(np.linalg.inv(cov))
+                    elif method == "mahalanobis_cd_latesum_wsq":
+                        # Assuming z_s is a PyTorch tensor on the CUDA device
+                        z_s = torch.from_numpy(z_s).cuda()  # Ensure the tensor is on the GPU
+                        z_q_t = torch.from_numpy(z_q).cuda()  # Ensure the tensor is on the GPU
+
+                        # Compute the covariance matrix with regularization
+                        mean_z_s = torch.mean(z_s, dim=0, keepdim=True)
+                        mean_z_q = torch.mean(z_q_t, dim=0, keepdim=True)
+                        centered_z_s = z_s - mean_z_s
+                        centered_z_q = z_q_t - mean_z_q
+                        cov = (centered_z_s.T @ centered_z_s) / (z_s.shape[0]) + 1e-6 * torch.eye(z_s.shape[1], device=z_s.device)
+                        cov_q = (centered_z_q.T @ centered_z_q) / (z_q_t.shape[0]) + 1e-6 * torch.eye(z_q_t.shape[1], device=z_s.device)
+                        
+                        # Compute the inverse of the covariance matrix
+                        inv_cov_task.append(torch.inverse(cov).cpu().numpy())
+                        inv_cov_task_q.append(torch.inverse(cov_q).cpu().numpy())
+                else:
+                    inv_cov_task.append(0)
+                
             z_s_all.append(z_s_task)
             w_q_all.append(w_q_task)
             w_sq_all.append(w_sq_task)
             w_s_all.append(w_s_task)
             inv_cov_matrices.append(inv_cov_task)
+            inv_cov_matrices_q.append(inv_cov_task_q)
 
         test_embs = np.expand_dims(test_embs, 1)
         z_s = np.asarray(z_s_all)
@@ -98,7 +120,12 @@ class FSAIC():
         w_s = w_s_all / np.expand_dims(np.linalg.norm(w_s_all, ord=2, axis=-1), axis=-1)
 
         inv_cov_matrices = np.asarray(inv_cov_matrices)
+        inv_cov_matrices_q = np.asarray(inv_cov_matrices_q)
 
+        Q_no = test_embs.shape[2]
+        S_no = z_s.shape[2]
+        alpha = Q_no/S_no
+        
         if method == 'normal':
             dist_w_sq_support = np.sum((w_sq-z_s)**2,axis=2)
             dist_w_s_support = np.sum((w_s-z_s)**2,axis=2)
@@ -109,29 +136,35 @@ class FSAIC():
             dist_w_s_support = np.sum((w_s-z_s)**2,axis=2)
             dist_w_sq_query = np.sum((w_sq-w_q)**2,axis=2)
         
-        elif method == 'normal_mahalanobis_latesum':
-            diff_sq_support = w_sq - z_s
-            diff_s_support = w_s - z_s
-            diff_sq_query = w_sq - test_embs
-
-            dist_w_sq_support = np.sum(np.sum(np.einsum('...ij,...jk->...ik', diff_sq_support, inv_cov_matrices) * diff_sq_support, axis=2,keepdims=True),axis=-1)
-            dist_w_s_support = np.sum(np.sum(np.einsum('...ij,...jk->...ik', diff_s_support, inv_cov_matrices) * diff_s_support, axis=2,keepdims=True),axis=-1)
-            dist_w_sq_query = np.sum(np.sum(np.einsum('...ij,...jk->...ik', diff_sq_query, inv_cov_matrices) * diff_sq_query, axis=2,keepdims=True),axis=-1)
-
-        elif method == 'mahalanobis_latesum':
-            diff_s_query = w_s - test_embs
-            dist_w_s_query = np.sum(np.sum(np.einsum('...ij,...jk->...ik', diff_s_query, inv_cov_matrices) * diff_s_query, axis=2,keepdims=True),axis=-1)
-            final_distance = dist_w_s_query
-            
-            return final_distance
-        
         elif method == 'mahalanobis_cd_latesum':
+            
             diff_s_query = w_s - w_q
             dist_w_s_query = np.sum(np.sum(np.einsum('...ij,...jk->...ik', diff_s_query, inv_cov_matrices) * diff_s_query, axis=2,keepdims=True),axis=-1)
             final_distance = dist_w_s_query
             
             return final_distance
         
+        elif method == 'mahalanobis_cd_latesum_wsq':
+            
+            diff_s_query = w_s - w_q
+            dist_w_s_query = np.sum(np.sum(np.einsum('...ij,...jk->...ik', diff_s_query, inv_cov_matrices) * diff_s_query, axis=2,keepdims=True),axis=-1)
+            dist_w_q_support = np.sum(np.sum(np.einsum('...ij,...jk->...ik', diff_s_query, inv_cov_matrices_q) * diff_s_query, axis=2,keepdims=True),axis=-1)
+            
+            final_distance = dist_w_s_query + dist_w_q_support
+
+            return final_distance
+
+        elif method == 'mahalanobis_cd_latesum_wsq_alpha':
+            
+            diff_s_query = w_s - w_q
+            dist_w_s_query = np.sum(np.sum(np.einsum('...ij,...jk->...ik', diff_s_query, inv_cov_matrices) * diff_s_query, axis=2,keepdims=True),axis=-1)
+            dist_w_q_support = np.sum(np.sum(np.einsum('...ij,...jk->...ik', diff_s_query, inv_cov_matrices_q) * diff_s_query, axis=2,keepdims=True),axis=-1)
+            
+            final_distance = (1-alpha/2)*dist_w_s_query + (alpha/2)*dist_w_q_support
+
+            return final_distance
+
+
         final_distance = dist_w_sq_query + (dist_w_sq_support - dist_w_s_support)
 
         return final_distance
@@ -149,7 +182,7 @@ class FSAIC():
         w_sq_all = []
         w_q_all = []
         for i,task_classes in enumerate(sampled_classes):
-            task_distances = []
+            
             # Query samples for task i
             z_q = test_embs[i]
             z_s_task = []
@@ -172,7 +205,6 @@ class FSAIC():
                 w_s_task.append(sum_z_s)
                 w_sq_task.append(w_sq)
 
-            #distances.append(task_distances)
             z_s_all.append(z_s_task)
             w_q_all.append(w_q_task)
             w_sq_all.append(w_sq_task)
@@ -238,4 +270,3 @@ def compute_acc_5(pred_labels, test_labels):
     acc_list = torch.tensor(np.array(acc_list)).float().mean(dim=1).tolist()
 
     return acc_list
-
