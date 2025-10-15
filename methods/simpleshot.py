@@ -23,8 +23,6 @@ class Simpleshot():
             pred_labels, pred_labels_5 = self.inductive(enroll_embs,enroll_labels,test_embs,test_labels)
             pred_labels = majority_or_original(pred_labels)
         
-        elif self.method == "sscd":
-            pred_labels, pred_labels_5 = self.sscd(enroll_embs,enroll_labels,test_embs,test_labels)
         
         test_labels = torch.from_numpy(test_labels).long()
         
@@ -95,45 +93,6 @@ class Simpleshot():
 
         return pred_labels, pred_labels_top5
 
-
-    def sscd(self,enroll_embs,enroll_labels,test_embs,test_labels):
-        """
-        enroll_embs: [n_tasks,k_shot*n_ways,192]
-        enroll_labels: [n_tasks,k_shot*n_ways]
-        test_embs: [n_tasks,n_query,192]
-        test_labels: [n_tasks,n_query]
-        """
-        # Calculate the mean embeddings for each class in the support
-
-        n_query = test_embs.shape[1]
-        avg_enroll_embs = torch.from_numpy(self.calculate_centroids(enroll_embs, enroll_labels)).float().to(self.device)
-        avg_test_embs = torch.from_numpy(self.calculate_centroids(test_embs, test_labels)).float().to(self.device)
-        
-        if self.backend == "cosine":
-            print("Using SSCD method with cosine similarity backend.")
-
-            avg_test_embs = avg_test_embs / np.expand_dims(np.linalg.norm(avg_test_embs, ord=2, axis=-1),axis=-1)
-            avg_enroll_embs = avg_enroll_embs / np.expand_dims(np.linalg.norm(avg_enroll_embs, ord=2, axis=-1),axis=-1)
-
-            scores = 1 - torch.einsum('ijk,ilk->ijl', avg_test_embs, avg_enroll_embs).repeat(1,n_query,1)
-        
-        else:
-            print("Using SSCD method with L2 norm backend.")
-            avg_test_embs = avg_test_embs / np.expand_dims(np.linalg.norm(avg_test_embs, ord=2, axis=-1),axis=-1)
-            avg_enroll_embs = avg_enroll_embs / np.expand_dims(np.linalg.norm(avg_enroll_embs, ord=2, axis=-1),axis=-1)
-            
-            print(avg_test_embs.shape)
-            print(avg_enroll_embs.shape)
-            # Class distance
-            dist = (avg_test_embs-avg_enroll_embs)**2
-            dist = torch.unsqueeze(dist,1)
-            scores = torch.sum(dist,dim=-1).repeat(1,n_query,1) # [n_tasks,n_query,1251]
-
-        pred_labels = torch.argmin(scores, dim=-1).long()
-        _,pred_labels_top5 = torch.topk(scores, k=5, dim=-1, largest=False)
-        
-        return pred_labels, pred_labels_top5
-    
 def compute_acc(pred_labels, test_labels):
     # Check if the input tensors have the same shape
     assert pred_labels.shape == test_labels.shape, "Shape mismatch between predicted and groundtruth labels"
