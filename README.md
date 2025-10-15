@@ -38,17 +38,69 @@ Unlike conventional few-shot learning setups, our method efficiently handles lar
 
 ---
 
+## Extracted embeddings and pretrained models
+
+The pretrained models were trained using the [ECAPA-TDNN](https://github.com/TaoRuijie/ECAPA-TDNN) repo and the already extracted features from the audio splits used in the paper can be found [here](https://drive.google.com/drive/folders/1LnUDekondromtCUSC_jFzLV8LB8DYXIT?usp=sharing).
+
 ## 📦 Installation
+
+Conda installation:
 
 ```bash
 # clone repo
-git clone https://github.com/<your-username>/few-shot-speaker-identification.git
+git clone https://github.com/gabitza-tech/few-shot-si.git
 cd few-shot-speaker-identification
 
 # create and activate environment
-conda create -n fewshot-si python=3.10
-conda activate fewshot-si
+conda env create -f environment.yml
+```
+## 🧪 Running Experiments
 
-# install dependencies
-pip install -r requirements.txt
+You can run few-shot evaluations using our scripts in src/.
 
+▶️ Single Experiment (Default Setting)
+
+```
+export PYTHONPATH=$(pwd)
+python3 src/few_shot.py <embeddings_path> <out_dir> False <k_shots> <seed>
+```
+
+- <embeddings_path> — path to the precomputed embeddings (.npy or similar)
+
+- <out_dir> — directory where the results will be saved
+
+- <use_mean>=False — whether to run transductive iterations (default: False)
+
+- <k_shots> — number of support shots per speaker (e.g., 1, 3, or 5)
+
+- <\seed> — random seed for reproducibility
+
+🔁 Multiple Experiments
+
+To automate multiple runs with different parameters (e.g., multiple seeds or shot configurations):
+
+```
+export PYTHONPATH=$(pwd)
+python3 src/run_few_shot.py
+```
+
+## 🧭 Acknowledgements
+
+- Backbone training adapted from [ECAPA-TDNN](https://github.com/TaoRuijie/ECAPA-TDNN)
+
+## 🧾 Citation
+
+```
+@inproceedings{pirlogeanu2025fewshot,
+  title={Closed-Set Speaker Identification using Few-Shot Transductive Learning},
+  author={Gabriel Pîrlogeanu and Ana Neacșu and Horia Cucu and Jean-Christophe Pesquet and Ismail Ben Ayed},
+  booktitle={Proc. European Signal Processing Conference (EUSIPCO)},
+  year={2025}
+}
+```
+
+## 📬 Contact
+
+For questions, collaborations, or clarifications:
+
+Gabriel Pîrlogeanu — `gabriel.pirlogeanu@upb.ro`
