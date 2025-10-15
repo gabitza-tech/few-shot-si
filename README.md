@@ -40,7 +40,7 @@ Unlike conventional few-shot learning setups, our method efficiently handles lar
 
 ## Extracted embeddings and pretrained models
 
-The pretrained models were trained using the [ECAPA-TDNN](https://github.com/TaoRuijie/ECAPA-TDNN) repo and the already extracted features from the audio splits used in the paper can be found [here](https://drive.google.com/drive/folders/1LnUDekondromtCUSC_jFzLV8LB8DYXIT?usp=sharing).
+The pretrained models (`/models`) were trained using the [ECAPA-TDNN](https://github.com/TaoRuijie/ECAPA-TDNN) repo and the already extracted features from the audio splits used in the paper can be found [here](https://drive.google.com/drive/folders/1LnUDekondromtCUSC_jFzLV8LB8DYXIT?usp=sharing).
 
 ## 📦 Installation
 
