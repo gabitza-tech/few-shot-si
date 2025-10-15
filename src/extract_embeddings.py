@@ -13,16 +13,17 @@ if __name__ == "__main__":
     parser.add_argument('--eval_list',  type=str,   default="/home/gpirlogeanu/git_repos/ECAPA-TDNN/dataset_files/cn_vox2_paths.txt", help='The path of the evaluation list.')
     parser.add_argument('--batch_size', type=int,   default=256,     help='Batch size')
     parser.add_argument('--num_frames', type=int,   default=300,     help='Duration of the input segments, eg: 200 for 2 second')
-    parser.add_argument('--n_cpu',      type=int,   default=20,       help='Number of loader threads')
-    parser.add_argument('--out_file',      type=str,   default='out_file.pkl',       help='Out pkl file')
-
+    parser.add_argument('--n_cpu', type=int,   default=20,       help='Number of loader threads')
+    parser.add_argument('--out_file', type=str,   default='out_file.pkl',       help='Out pkl file')
+    parser.add_argument('--seed', type=int,   default=42,       help='Seed number for test dataloader')
+    
     ## Initialization
     warnings.simplefilter("ignore")
     torch.multiprocessing.set_sharing_strategy('file_system')
     args = parser.parse_args()
     
     ## Define the data loader
-    test_loader = test_loader(test_list=args.eval_list,num_frames=args.num_frames)
+    test_loader = test_loader(test_list=args.eval_list,num_frames=args.num_frames, seed_no=args.seed)
     test_dataloader = torch.utils.data.DataLoader(test_loader, batch_size = args.batch_size, shuffle = False, num_workers = args.n_cpu)#, drop_last = True)
 
     ## Load model

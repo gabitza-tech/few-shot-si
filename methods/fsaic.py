@@ -26,6 +26,9 @@ class FSAIC():
     def calculate_mahalanobis_centroids(self, enroll_embs, test_embs, enroll_labels, method='centroid'):
         # Returns [n_tasks, n_ways, 192] tensor with the centroids
         # sampled_classes: [n_tasks, n_ways]
+        
+        beta = 1
+        
         sampled_classes = []
         for task in enroll_labels:
             sampled_classes.append(sorted(list(set(task))))
@@ -86,17 +89,23 @@ class FSAIC():
                         z_s = torch.from_numpy(z_s).cuda()  # Ensure the tensor is on the GPU
                         z_q_t = torch.from_numpy(z_q).cuda()  # Ensure the tensor is on the GPU
 
+                        #z_sq_t = torch.concat([z_s,z_q_t],dim=0)
                         # Compute the covariance matrix with regularization
                         mean_z_s = torch.mean(z_s, dim=0, keepdim=True)
+                        #mean_z_s = mean_z_s / torch.norm(mean_z_s, p=2, dim=-1, keepdim=True)
                         mean_z_q = torch.mean(z_q_t, dim=0, keepdim=True)
+                        #mean_z_q = mean_z_q / torch.norm(mean_z_q, p=2, dim=-1, keepdim=True)
                         centered_z_s = z_s - mean_z_s
                         centered_z_q = z_q_t - mean_z_q
+                        #alpha = z_s.shape[0]/z_q.shape[0]
                         cov = (centered_z_s.T @ centered_z_s) / (z_s.shape[0]) + 1e-6 * torch.eye(z_s.shape[1], device=z_s.device)
-                        cov_q = (centered_z_q.T @ centered_z_q) / (z_q_t.shape[0]) + 1e-6 * torch.eye(z_q_t.shape[1], device=z_s.device)
-                        
+                        cov_q = (centered_z_q.T @ centered_z_q) / (z_q_t.shape[0]) + 1e-6 * torch.eye(z_q_t.shape[1], device=z_q_t.device)
+
+                        #cov = (alpha/2)*(centered_z_s.T @ centered_z_s)/ (z_s.shape[0]) + (1-alpha/2)*(centered_z_q.T @ centered_z_q) / (z_q_t.shape[0]) + 1e-6 * torch.eye(z_q_t.shape[1], device=z_s.device)
                         # Compute the inverse of the covariance matrix
                         inv_cov_task.append(torch.inverse(cov).cpu().numpy())
                         inv_cov_task_q.append(torch.inverse(cov_q).cpu().numpy())
+
                 else:
                     inv_cov_task.append(0)
                 
@@ -124,7 +133,8 @@ class FSAIC():
 
         Q_no = test_embs.shape[2]
         S_no = z_s.shape[2]
-        alpha = Q_no/S_no
+        
+        alpha = Q_no/(S_no+Q_no)
         
         if method == 'normal':
             dist_w_sq_support = np.sum((w_sq-z_s)**2,axis=2)
@@ -137,7 +147,6 @@ class FSAIC():
             dist_w_sq_query = np.sum((w_sq-w_q)**2,axis=2)
         
         elif method == 'mahalanobis_cd_latesum':
-            
             diff_s_query = w_s - w_q
             dist_w_s_query = np.sum(np.sum(np.einsum('...ij,...jk->...ik', diff_s_query, inv_cov_matrices) * diff_s_query, axis=2,keepdims=True),axis=-1)
             final_distance = dist_w_s_query
@@ -145,25 +154,15 @@ class FSAIC():
             return final_distance
         
         elif method == 'mahalanobis_cd_latesum_wsq':
-            
             diff_s_query = w_s - w_q
             dist_w_s_query = np.sum(np.sum(np.einsum('...ij,...jk->...ik', diff_s_query, inv_cov_matrices) * diff_s_query, axis=2,keepdims=True),axis=-1)
             dist_w_q_support = np.sum(np.sum(np.einsum('...ij,...jk->...ik', diff_s_query, inv_cov_matrices_q) * diff_s_query, axis=2,keepdims=True),axis=-1)
-            
-            final_distance = dist_w_s_query + dist_w_q_support
 
+            final_distance = alpha*dist_w_q_support + (1-alpha)*dist_w_s_query 
+            
+            print(dist_w_s_query[0][0])
+            print(dist_w_q_support[0][0])
             return final_distance
-
-        elif method == 'mahalanobis_cd_latesum_wsq_alpha':
-            
-            diff_s_query = w_s - w_q
-            dist_w_s_query = np.sum(np.sum(np.einsum('...ij,...jk->...ik', diff_s_query, inv_cov_matrices) * diff_s_query, axis=2,keepdims=True),axis=-1)
-            dist_w_q_support = np.sum(np.sum(np.einsum('...ij,...jk->...ik', diff_s_query, inv_cov_matrices_q) * diff_s_query, axis=2,keepdims=True),axis=-1)
-            
-            final_distance = (1-alpha/2)*dist_w_s_query + (alpha/2)*dist_w_q_support
-
-            return final_distance
-
 
         final_distance = dist_w_sq_query + (dist_w_sq_support - dist_w_s_support)
 

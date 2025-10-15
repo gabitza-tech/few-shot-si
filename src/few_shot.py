@@ -15,10 +15,6 @@ import os
 from utils.utils import CL2N_embeddings,embedding_normalize,embs_norm_both
 import sys
 
-#query_file = 'embeddings_vox2/voxmovies_257.pkl'
-#support_file = 'embeddings_vox2/voxceleb1_257.pkl'
-#test_dict = np.load(query_file, allow_pickle=True)
-#enroll_dict = np.load(support_file, allow_pickle=True)   
 dataset_file = sys.argv[1]
 merged_dict = np.load(dataset_file,allow_pickle=True)
 
@@ -28,8 +24,8 @@ if not os.path.exists(out_dir):
 
 seed = int(sys.argv[5])
 
-n_tasks = 200
-batch_size = 200
+n_tasks = 10
+batch_size = 50
 
 args={}
 args['iter']=30
@@ -127,10 +123,10 @@ for k_shot in k_shots:
                     #acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end]) 
                     #acc["fsaic"].extend(acc_list)
                 
-                    #eval = FSAIC(method="centroid")
-                    #acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end])
-                    #acc["fsaic_centroid"].extend(acc_list)
-                    #acc["fsaic_centroid_5"].extend(acc_list_5)
+                    eval = FSAIC(method="centroid")
+                    acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end])
+                    acc["fsaic_centroid"].extend(acc_list)
+                    acc["fsaic_centroid_5"].extend(acc_list_5)
                     
                     eval = FSAIC(method="mahalanobis_cd_latesum")
                     acc_list, acc_list_5, pred_labels_5 = eval.eval(x_s, y_s, x_q, y_q, test_audios[start:end])
@@ -159,7 +155,6 @@ for k_shot in k_shots:
                 else:
                     args['maj_vote'] = False
 
-                
                 args['alpha'] = alpha
                 method_info = {'device':'cuda','args':args}
                 acc_list,_ = run_method(x_s, y_s, x_q, y_q,method_info,'paddle')
@@ -183,8 +178,8 @@ for k_shot in k_shots:
             final_json['sscd'] = 100*sum(acc["sscd"])/len(acc["sscd"])
             final_json['sscd_5'] = 100*sum(acc["sscd_5"])/len(acc["sscd_5"])
             #final_json['fsaic'] = 100*sum(acc["fsaic"])/len(acc["fsaic"])
-            #final_json['fsaic_centroid'] = 100*sum(acc["fsaic_centroid"])/len(acc["fsaic_centroid"])
-            #final_json['fsaic_centroid_5'] = 100*sum(acc["fsaic_centroid_5"])/len(acc["fsaic_centroid_5"])
+            final_json['fsaic_centroid'] = 100*sum(acc["fsaic_centroid"])/len(acc["fsaic_centroid"])
+            final_json['fsaic_centroid_5'] = 100*sum(acc["fsaic_centroid_5"])/len(acc["fsaic_centroid_5"])
             final_json['mahalanobis_cd_latesum'] = 100*sum(acc["mahalanobis_cd_latesum"])/len(acc["mahalanobis_cd_latesum"])
             final_json['mahalanobis_cd_latesum_5'] = 100*sum(acc["mahalanobis_cd_latesum_5"])/len(acc["mahalanobis_cd_latesum_5"])
             final_json['mahalanobis_cd_latesum_wsq'] = 100*sum(acc["mahalanobis_cd_latesum_wsq"])/len(acc["mahalanobis_cd_latesum_wsq"])

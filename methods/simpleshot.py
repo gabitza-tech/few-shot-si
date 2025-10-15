@@ -122,6 +122,8 @@ class Simpleshot():
             avg_test_embs = avg_test_embs / np.expand_dims(np.linalg.norm(avg_test_embs, ord=2, axis=-1),axis=-1)
             avg_enroll_embs = avg_enroll_embs / np.expand_dims(np.linalg.norm(avg_enroll_embs, ord=2, axis=-1),axis=-1)
             
+            print(avg_test_embs.shape)
+            print(avg_enroll_embs.shape)
             # Class distance
             dist = (avg_test_embs-avg_enroll_embs)**2
             dist = torch.unsqueeze(dist,1)

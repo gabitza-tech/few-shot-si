@@ -92,7 +92,8 @@ class train_loader(object):
 
 
 class test_loader(object):
-    def __init__(self, test_list, num_frames=300, **kwargs):
+    def __init__(self, test_list, num_frames=300, seed_no=42, **kwargs):
+        random.seed(seed_no)
         self.num_frames = num_frames
         # Load data & labels
         self.data_list  = []
