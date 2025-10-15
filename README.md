@@ -1,143 +1,53 @@
-## Introduction
+# Closed-Set Speaker Identification using Few-Shot Transductive Learning
 
-This repository contains my unofficial reimplementation of the standard [ECAPA-TDNN](https://arxiv.org/pdf/2005.07143.pdf), which is the speaker recognition in VoxCeleb2 dataset.
+[![Conference](https://img.shields.io/badge/EUSIPCO-2025-blue)](https://www.eusipco.org/)
+[![Paper](https://img.shields.io/badge/Paper-PDF-red)](./2025_eusipco_camera_ready.pdf)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-This repository is modified based on [voxceleb_trainer](https://github.com/clovaai/voxceleb_trainer).
+This repository contains the official implementation and experimental setup for the paper:
 
-## Best Performance in this project (with AS-norm)
+> **Closed-Set Speaker Identification using Few-Shot Transductive Learning**  
+> *Gabriel Pîrlogeanu, Ana Neacșu, Horia Cucu, Jean-Christophe Pesquet, Ismail Ben Ayed*  
+> Presented at **EUSIPCO 2025**
 
-| Dataset |  Vox1_O  |  Vox1_E  |  Vox1_H  |
-| ------- |  ------  |  ------  |  ------  |
-|  EER    |   0.86   |  1.18    |  2.17    |
-|  minDCF |  0.0686  | 0.0765   |  0.1295  |
+📄 [Read the paper](./2025_eusipco_camera_ready.pdf)
 
-Notice, this result is in the Vox1_O clean list, for Vox1_O Noise list: EER is 1.00 and minDCF is 0.0713.
-***
+---
 
-## System Description
+## 🧠 Overview
 
-I have uploaded the [system description](https://arxiv.org/pdf/2111.06671.pdf), please check the Session 3, `ECAPA-TDNN SYSTEM`.
+Closed-set unseen speaker identification plays a critical role in applications such as forensics, fraud detection, and speaker retrieval.  
+We address this task through the **Few-Shot for A Single Class (FSAiC)** method — a **tuning-free transductive learning** approach designed for identifying an unseen speaker from a large watchlist using only a few short utterances.
 
-### Dependencies
+- **Closed-set scenario**: all queries come from enrolled watchlist speakers unseen during training.  
+- **Few-shot transductive setting**: single speaker per query set, with 1–5 utterances.
+- **Scalable** to hundreds of classes.
+- **Outperforms** state-of-the-art inductive and transductive baselines.
 
-Note: That is the setting based on my device, you can modify the torch and torchaudio version based on your device.
+---
 
-Start from building the environment
-```
-conda create -n ECAPA python=3.7.9 anaconda
-conda activate ECAPA
+## 🧭 Method Overview
+
+<!-- Place pipeline / diagram image here -->
+<p align="center">
+  <img src="docs/method_diagram.png" alt="FSAiC pipeline diagram" width="80%">
+</p>
+
+We propose **FSAiC** — Few-Shot for A Single Class — which leverages a maximum likelihood formulation tailored to the single-class query scenario.  
+Unlike conventional few-shot learning setups, our method efficiently handles large support sets while remaining tuning-free.
+
+---
+
+## 📦 Installation
+
+```bash
+# clone repo
+git clone https://github.com/<your-username>/few-shot-speaker-identification.git
+cd few-shot-speaker-identification
+
+# create and activate environment
+conda create -n fewshot-si python=3.10
+conda activate fewshot-si
+
+# install dependencies
 pip install -r requirements.txt
-```
-
-Start from the existing environment
-```
-pip install -r requirements.txt
-```
-
-### Data preparation
-
-Please follow the official code to perpare your VoxCeleb2 dataset from the 'Data preparation' part in [this repository](https://github.com/clovaai/voxceleb_trainer).
-
-Dataset for training usage: 
-
-1) VoxCeleb2 training set;
-
-2) MUSAN dataset;
-
-3) RIR dataset.
-
-Dataset for evaluation: 
-
-1) VoxCeleb1 test set for [Vox1_O](https://www.robots.ox.ac.uk/~vgg/data/voxceleb/meta/veri_test2.txt) 
-
-2) VoxCeleb1 train set for [Vox1_E](https://www.robots.ox.ac.uk/~vgg/data/voxceleb/meta/list_test_all2.txt) and [Vox1_H](https://www.robots.ox.ac.uk/~vgg/data/voxceleb/meta/list_test_hard2.txt) (Optional)
-
-### Training
-
-Then you can change the data path in the `trainECAPAModel.py`. Train ECAPA-TDNN model end-to-end by using:
-
-```
-python trainECAPAModel.py --save_path exps/exp1 
-```
-
-Every `test_step` epoches, system will be evaluated in Vox1_O set and print the EER. 
-
-The result will be saved in `exps/exp1/score.txt`. The model will saved in `exps/exp1/model`
-
-In my case, I trained 80 epoches in one 3090 GPU. Each epoch takes 37 mins, the total training time is about 48 hours.
-
-### Pretrained model
-
-Our pretrained model performs `EER: 0.96` in Vox1_O set without AS-norm, you can check it by using: 
-
-```
-python trainECAPAModel.py --eval --initial_model exps/pretrain.model
-```
-
-With AS-norm, this system performs `EER: 0.86`. We will not update this code recently since no enough time for this work. I suggest you the following paper if you want to add AS-norm or other norm methods:
-
-```
-Matejka, Pavel, et al. "Analysis of Score Normalization in Multilingual Speaker Recognition." INTERSPEECH. 2017.
-```
-
-We also update the score.txt file in `exps/pretrain_score.txt`, it contains the training loss, training acc and EER in Vox1_O in each epoch for your reference.
-
-***
-
-
-### Reference
-
-Original ECAPA-TDNN paper
-```
-@inproceedings{desplanques2020ecapa,
-  title={{ECAPA-TDNN: Emphasized Channel Attention, propagation and aggregation in TDNN based speaker verification}},
-  author={Desplanques, Brecht and Thienpondt, Jenthe and Demuynck, Kris},
-  booktitle={Interspeech 2020},
-  pages={3830--3834},
-  year={2020}
-}
-```
-
-Our reimplement report
-```
-@article{das2021hlt,
-  title={HLT-NUS SUBMISSION FOR 2020 NIST Conversational Telephone Speech SRE},
-  author={Das, Rohan Kumar and Tao, Ruijie and Li, Haizhou},
-  journal={arXiv preprint arXiv:2111.06671},
-  year={2021}
-}
-```
-
-VoxCeleb_trainer paper
-```
-@inproceedings{chung2020in,
-  title={In defence of metric learning for speaker recognition},
-  author={Chung, Joon Son and Huh, Jaesung and Mun, Seongkyu and Lee, Minjae and Heo, Hee Soo and Choe, Soyeon and Ham, Chiheon and Jung, Sunghwan and Lee, Bong-Jin and Han, Icksang},
-  booktitle={Interspeech},
-  year={2020}
-}
-```
-
-### Acknowledge
-
-We study many useful projects in our codeing process, which includes:
-
-[clovaai/voxceleb_trainer](https://github.com/clovaai/voxceleb_trainer).
-
-[lawlict/ECAPA-TDNN](https://github.com/lawlict/ECAPA-TDNN/blob/master/ecapa_tdnn.py).
-
-[speechbrain/speechbrain](https://github.com/speechbrain/speechbrain/blob/96077e9a1afff89d3f5ff47cab4bca0202770e4f/speechbrain/lobes/models/ECAPA_TDNN.py)
-
-[ranchlai/speaker-verification](https://github.com/ranchlai/speaker-verification)
-
-Thanks for these authors to open source their code!
-
-### Notes
-
-If you meet the problems about this repository, **Please ask me from the 'issue' part in Github (using English) instead of sending the messages to me from bilibili, so others can also benifit from it.** Thanks for your understanding!
-
-If you improve the result based on this repository by some methods, please let me know. Thanks!
-
-### Cooperation
-
-If you are interested to work on this topic and have some ideas to implement, I am glad to collaborate and contribute with my experiences & knowlegde in this topic. Please contact me with ruijie.tao@u.nus.edu.
