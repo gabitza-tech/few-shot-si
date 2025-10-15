@@ -2,7 +2,6 @@
 
 [![Conference](https://img.shields.io/badge/EUSIPCO-2025-blue)](https://www.eusipco.org/)
 [![Paper](https://img.shields.io/badge/Paper-PDF-red)](./2025_eusipco_camera_ready.pdf)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 This repository contains the official implementation and experimental setup for the paper:
 
