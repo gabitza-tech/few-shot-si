@@ -30,7 +30,7 @@ We address this task through the **Few-Shot for A Single Class (FSAiC)** method 
 
 <!-- Place pipeline / diagram image here -->
 <p align="center">
-  <img src="docs/method_diagram.png" alt="FSAiC pipeline diagram" width="80%">
+  <img src="eusipco_setup.drawio (3).svg" alt="FSAiC pipeline diagram" width="80%">
 </p>
 
 We propose **FSAiC** — Few-Shot for A Single Class — which leverages a maximum likelihood formulation tailored to the single-class query scenario.  
@@ -51,3 +51,4 @@ conda activate fewshot-si
 
 # install dependencies
 pip install -r requirements.txt
+
