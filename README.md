@@ -1,7 +1,7 @@
 # Closed-Set Speaker Identification using Few-Shot Transductive Learning
 
 [![Conference](https://img.shields.io/badge/EUSIPCO-2025-blue)](https://www.eusipco.org/)
-[![Paper](https://img.shields.io/badge/Paper-PDF-red)](./2025_eusipco_camera_ready.pdf)
+[![Paper](https://img.shields.io/badge/Paper-PDF-red)]([./2025_eusipco_camera_ready.pdf](https://ieeexplore.ieee.org/document/11226136/))
 
 This repository contains the official implementation and experimental setup for the paper:
 
@@ -9,7 +9,7 @@ This repository contains the official implementation and experimental setup for 
 > *Gabriel Pîrlogeanu, Ana Neacșu, Horia Cucu, Jean-Christophe Pesquet, Ismail Ben Ayed*  
 > Presented at **EUSIPCO 2025**
 
-📄 [Read the paper](./2025_eusipco_camera_ready.pdf)
+📄 [Read the paper]([./2025_eusipco_camera_ready.pdf](https://ieeexplore.ieee.org/document/11226136/))
 
 ---
 
