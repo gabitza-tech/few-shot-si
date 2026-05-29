@@ -9,8 +9,6 @@ This repository contains the official implementation and experimental setup for 
 > *Gabriel Pîrlogeanu, Ana Neacșu, Horia Cucu, Jean-Christophe Pesquet, Ismail Ben Ayed*  
 > Presented at **EUSIPCO 2025**
 
-📄 [Read the paper]([./2025_eusipco_camera_ready.pdf](https://eusipco2025.org/wp-content/uploads/pdfs/0000046.pdf)
-
 ---
 
 ## 🧠 Overview
