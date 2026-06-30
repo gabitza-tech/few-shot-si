@@ -66,7 +66,7 @@ python3 src/few_shot.py <embeddings_path> <out_dir> False <k_shots> <seed>
 
 - <out_dir> — directory where the results will be saved
 
-- <use_mean>=False — whether to run transductive iterations (default: False)
+- <use_mean>=False — whether to run feature mean normalization (default: False)
 
 - <k_shots> — number of support shots per speaker (e.g., 1, 3, or 5)
 
